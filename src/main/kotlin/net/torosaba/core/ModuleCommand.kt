@@ -71,7 +71,8 @@ class CommandRegistry(private val plugin: TOROCore) {
     fun unregister(command: ModuleCommand) {
         val map = Bukkit.getCommandMap()
         val known = map.knownCommands
-        known.entries.removeIf { it.value === command }
+        // Paper の knownCommands はイテレーター経由の削除ができないので、キーを集めてから消す
+        known.filterValues { it === command }.keys.forEach { known.remove(it) }
         command.unregister(map)
         replaced.remove(command)?.forEach { (label, previous) -> known.putIfAbsent(label, previous) }
     }

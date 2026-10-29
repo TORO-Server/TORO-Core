@@ -1,0 +1,22 @@
+# TORO-Core の world-border モジュール (旧 WorldBorder)。キーと書式は元の WorldBorder と同じ。
+# 境界は /wb set などで設定すると、worlds: の下にワールドごとに書き込まれる。
+# fill / trim 関係のキーは移植していないので使わない (書いてあっても消さない)。
+cfg-version: 12
+message: '&cYou have reached the edge of this world.'
+round-border: true
+debug-mode: false
+whoosh-effect: true
+portal-redirection: true
+knock-back-dist: 3.0
+timer-delay-ticks: 5
+remount-delay-ticks: 0
+dynmap-border-enabled: true
+dynmap-border-layer-label: WorldBorder
+dynmap-border-message: The border of the world.
+dynmap-border-hideByDefault: false
+dynmap-border-priority: 0
+player-killed-bad-spawn: false
+deny-enderpearl: true
+bypass-list-uuids: []
+prevent-block-place: false
+prevent-mob-spawn: false

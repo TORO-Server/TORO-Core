@@ -1,0 +1,9 @@
+# Time to return to previous game mode (Tick)
+cooldown: 60
+
+error:
+  default: "/stp [player]"
+  teleportBlock: "%s is refusing teleportation"
+result:
+  teleport: "teleported to %s"
+  cooldown: "Reverted to previous game mode"

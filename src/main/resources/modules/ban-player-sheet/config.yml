@@ -1,0 +1,14 @@
+URL: "Google Apps Script URL"
+
+Message:
+  BanReason: "Ban Reason"
+  Kick: "You are not allowed."
+  ErrorDatabase: "Unable to access database."
+  sBan: "/sban [PlayerName] [BanReason]"
+  unsBan: "/unsban [PlayerName]"
+  PlayerNotFound: "Player not found."
+
+  addBAN: "Player has been banned."
+  rmvBAN: "Player has been unbanned."
+  alreadyBAN: "Player has already been banned."
+  notBAN: "Player has not been banned."

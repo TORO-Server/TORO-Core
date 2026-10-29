@@ -52,7 +52,14 @@ class TOROCore : JavaPlugin() {
     }
 
     private fun disableModules() {
-        modules.asReversed().forEach { it.disable() }
+        // 1 つの失敗で残りのモジュールが止まらないことがないようにする
+        for (module in modules.asReversed()) {
+            try {
+                module.disable()
+            } catch (e: Throwable) {
+                logger.log(Level.SEVERE, "モジュール ${module.id} を止めるときにエラーが起きました", e)
+            }
+        }
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {

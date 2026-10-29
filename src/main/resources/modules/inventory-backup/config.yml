@@ -1,0 +1,7 @@
+chat-text: |-
+  §9§nあなたのインベントリにアイテムがありません。
+  §9§nこのメッセージをクリックするとインベントリを復元できます。
+hover-text: |-
+  §bインベントリを復元する。
+
+restore-command: "/inventorybackup:restore %d"

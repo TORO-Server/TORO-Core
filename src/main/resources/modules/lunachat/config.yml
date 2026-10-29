@@ -1,0 +1,138 @@
+# 旧 LunaChat (作者 ucchy, LGPL-3.0) の設定。キーと既定値は LunaChat 3 と同じ。
+# plugins/LunaChat/config.yml があれば、初回にそれがこのフォルダに写される。
+
+# -------------------- 全般設定 --------------------
+
+# メッセージの言語。messages/messages_<lang>.yml を読む (無ければ同梱の日本語)
+lang: ja
+
+# チャンネルチャット機能を利用可能にするかどうか
+# Japanize機能のみを利用したい場合は、falseにしてください。
+enableChannelChat: true
+
+# チャットイベントの処理優先度。LOWEST, LOW, NORMAL, HIGH, HIGHEST のどれか。
+playerChatEventListenerPriority: 'HIGHEST'
+
+
+# -------------------- チャンネルチャット設定 --------------------
+
+# チャンネルチャットに入っていない人の発言を、グローバルとして扱うかどうか
+noJoinAsGlobal: true
+
+# チャンネルチャットの発言内容を、ログ (logs/日付/チャンネル名.log) に残すかどうか
+loggingChat: true
+
+# チャンネルチャットの発言内容を、サーバーコンソールに表示するかどうか
+displayChatOnConsole: true
+
+# グローバルマーカー。これが発言の頭に入っている場合は、一時的にグローバル発言になる。
+globalMarker: '!'
+
+# 全てのメンバーが退出したときに、チャンネルを削除するかどうか
+zeroMemberRemove: false
+
+# ログイン時に、参加中チャンネルを表示するかどうか
+showListOnJoin: false
+
+# /ch join コマンドで存在しないチャンネルを指定したときに、チャンネルを新規作成して入室するかどうか
+createChannelOnJoinCommand: false
+
+# 通常のチャットの代わりに、既定として使用するグローバルチャンネル。
+# グローバルチャンネルを作らず通常のチャットを使用する場合は、から文字列 「''」 を指定すること。
+globalChannel: ''
+
+# サーバーに参加したユーザーに必ず参加させるチャンネル。例）forceJoinChannels: ['L', 'M', 'N']
+forceJoinChannels: []
+
+# formatコマンド実行時に、必ず含まれる必要があるキーワード。
+formatConstraint: ['%username', '%msg']
+
+# チャンネルを作成したときに、デフォルトで設定されるフォーマット設定。
+# %ch チャンネル名 / %color チャンネルカラー / %displayname 発言者表示名 / %player 発言者ID
+# %world ワールド名 / %prefix %suffix (Vault) / %date 日付 / %time 時刻 / %msg 発言内容
+defaultFormat: '&f[%color%ch&f]%prefix%displayname%suffix&a:&f %msg'
+
+# OPの画面に、全チャンネルの発言内容を表示する設定。
+opListenAllChannel: false
+
+# チャンネル名の最低文字列長と最大文字列長
+minChannelNameLength: 4
+maxChannelNameLength: 20
+
+# クイックチャンネルチャット機能 (「m:こんにちは！」のように、チャンネル名か別名と記号を付けて発言する)
+enableQuickChannelChat: true
+
+# クイックチャンネルチャット機能に使用する記号。
+quickChannelChatSeparator: ':'
+
+
+# -------------------- プライベートメッセージ設定 --------------------
+
+# /tell /msg /r で送るときのフォーマット。%to は受信者
+defaultFormatForPrivateMessage: '&7[%player -> %to]&f %msg'
+
+
+# -------------------- dynmap連携設定 --------------------
+
+# ブロードキャストチャンネルの発言内容を、dynmapに送信するかどうか。dynmapが無ければ無視される。
+sendBroadcastChannelChatToDynmap: true
+
+# dynmapへ送信するときに、チャンネルのフォーマットを反映して送信するかどうか。
+sendFormattedMessageToDynmap: false
+
+# dynmapのWebUIから発言された発言内容を表示するチャンネル。
+# 無指定でglobalChannelがあればグローバルチャンネルに、どちらも無ければ通常チャットに (dynmap が流す)。
+dynmapChannel: ''
+
+
+# -------------------- NGワード設定 --------------------
+
+# NGワード設定。正規表現が指定可能です。例）ngword: ['ちん(こ|ぽ|ちん)']
+ngword: []
+
+# NGワード発言時の動作。mask、mute、kick、ban のいずれか。
+# 通常チャット（非チャンネルチャット）では、マスクのみが実行されます。
+ngwordAction: mask
+
+
+# -------------------- 通常チャット設定 --------------------
+
+# 通常チャット（非チャンネルチャット）の装飾を行うかどうか。
+enableNormalChatMessageFormat: true
+
+# 通常チャットのフォーマット。%displayname %player %world %prefix %suffix %date %time %msg
+normalChatMessageFormat: '&f%prefix%displayname%suffix&a:&f %msg'
+
+# 通常チャットで、カラーコード（&aなど）を使用可能にするかどうか (権限 lunachat.allowcc も必要)。
+enableNormalChatColorCode: true
+
+# 通常チャットをクリック可能にするかどうか。
+# 通常チャットを取り消して別のメッセージを流すので、ほかのチャット関連プラグインに届かなくなります。
+enableNormalChatClickable: false
+
+# 通常チャットをコンソールに出すかどうか (クリック可能にしたときだけ効く)。
+displayNormalChatOnConsole: true
+
+
+# -------------------- Japanize変換設定 --------------------
+
+# none: 変換なし / kana: かな変換のみ / GoogleIME: かな変換したのち、GoogleIMEで漢字変換する
+japanizeType: GoogleIME
+
+# 1: 元の発言と変換結果を1行で表示 / 2: 変換結果を2行目に表示
+japanizeDisplayLine: 1
+
+# japanizeDisplayLine が 1 のときのフォーマット。%msg 元の発言 / %japanize 変換結果
+japanizeLine1Format: '%msg &6(%japanize)'
+
+# japanizeDisplayLine が 2 のときの、2行目のフォーマット。
+japanizeLine2Format: '&6[JP] %japanize'
+
+# 発言に含まれているプレイヤー名を、Japanize変換から除外するかどうか。
+japanizeIgnorePlayerName: true
+
+# ノンジャパナイズマーカー。これが発言の頭に入っている場合は、一時的にJapanize変換を実行しない。
+noneJapanizeMarker: '$'
+
+# プレイヤーのJapanize変換を、デフォルトでオンにするかオフにするか。
+japanizePlayerDefault: true

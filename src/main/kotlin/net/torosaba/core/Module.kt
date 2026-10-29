@@ -69,8 +69,10 @@ abstract class Module(
         }
         listeners.forEach { HandlerList.unregisterAll(it) }
         listeners.clear()
-        tasks.forEach { it.cancel() }
-        tasks.clear()
+        synchronized(tasks) {
+            tasks.forEach { it.cancel() }
+            tasks.clear()
+        }
         commands.forEach { plugin.commandRegistry.unregister(it) }
         commands.clear()
         permissions.forEach { Bukkit.getPluginManager().removePermission(it) }
@@ -135,7 +137,8 @@ abstract class Module(
     fun runSync(block: () -> Unit): BukkitTask =
         Bukkit.getScheduler().runTask(plugin, Runnable(block)).also { track(it) }
 
-    private fun track(task: BukkitTask) {
+    // runSync / runAsync は非同期スレッドからも呼ばれるので、tasks の操作はロックする
+    private fun track(task: BukkitTask) = synchronized(tasks) {
         // 終わったタスクは持ち続けない
         val scheduler = Bukkit.getScheduler()
         tasks.removeAll { it.isCancelled || (!scheduler.isQueued(it.taskId) && !scheduler.isCurrentlyRunning(it.taskId)) }

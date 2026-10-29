@@ -1,0 +1,25 @@
+HighRateLoginBlocker:
+  enable: true
+  allowed: 3
+  per: 200
+  cooldown: 10s
+
+SpamDetector:
+  enable: true
+  allowed: 1
+  per: 20
+  penalty:
+    mute: 1m
+    kick: true
+
+ChatFilter:
+  enable: true
+  pattern:
+    - "ディープステート"
+    - "^正規表現(も|が)使えます$"
+  penalty:
+    mute: 1m
+    kick: true
+
+OneIPMultiAccountBlocker:
+  enable: true
