@@ -1,0 +1,21 @@
+name: TORO-Core
+version: '${version}'
+main: net.torosaba.core.TOROCore
+api-version: '26.3'
+description: TORO サーバーの小さな自作プラグインと、開発の止まったプラグインの機能をまとめたもの
+authors: [ marumasa ]
+website: https://torosaba.net
+softdepend: [ LuckPerms, Vault, Essentials, dynmap, Multiverse-Core ]
+
+# モジュールのコマンドは各モジュールが有効になったときに登録する (plugin.yml には書かない)
+commands:
+  torocore:
+    description: TORO-Core のモジュールの一覧と再読み込み
+    aliases: [ toro-core ]
+    usage: /<command> [modules|reload [モジュール]]
+    permission: torocore.admin
+
+permissions:
+  torocore.admin:
+    description: /torocore を使う
+    default: op

@@ -1,0 +1,35 @@
+# TORO-Core
+# 各モジュールの設定は plugins/TORO-Core/<モジュール名>/config.yml にある。
+# 初めて有効にしたとき、元のプラグインのフォルダ (plugins/<旧プラグイン名>/) があれば中身を写す。
+# 元のプラグインの JAR は、TORO-Core を入れるときに plugins から外すこと (同じ機能が二重に動く)。
+#
+# false にしたモジュールは読み込まない。/torocore reload で反映する。
+modules:
+  # 自作プラグイン
+  add-perm: true
+  armor-stand: true
+  auto-message: true
+  ban-player-sheet: true
+  clock: true
+  clock-item-timer: true
+  dispenser-actions: true
+  dispenser-falling-block: true
+  effect-gui: true
+  hat-color-team: true
+  hide-nametag: true
+  infinity-dispense: true
+  inventory-backup: true
+  item-drop-cooldown: true
+  kill-potion-death-log: true
+  raid-watcher: true
+  report: true
+  skills: true
+  teleport-spectator: true
+  text-beacon: true
+  tps-log: true
+  warn-kill-potion: true
+  # 開発の止まったプラグインの代わり
+  lunachat: true
+  world-border: true
+  lift: true
+  see-more: true
