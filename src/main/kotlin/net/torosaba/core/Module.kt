@@ -47,6 +47,13 @@ abstract class Module(
     var enabled = false
         private set
 
+    /**
+     * サーバーの起動時 (プラグインの onLoad) に、モジュールが有効かどうかに関係なく 1 度だけ呼ぶ。
+     * ほかのプラグインが有効になる前にしかできないこと (WorldGuard のフラグの登録など) に使う。
+     * [plugin] や [config] はまだ使えない
+     */
+    open fun onServerLoad(plugin: TOROCore) {}
+
     open fun onEnable() {}
     open fun onDisable() {}
 

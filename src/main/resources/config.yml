@@ -33,3 +33,4 @@ modules:
   world-border: true
   lift: true
   see-more: true
+  dynmap-worldguard: true

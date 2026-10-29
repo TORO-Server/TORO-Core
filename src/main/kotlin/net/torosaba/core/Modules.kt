@@ -8,6 +8,7 @@ import net.torosaba.core.module.clock.ClockModule
 import net.torosaba.core.module.clockitemtimer.ClockItemTimerModule
 import net.torosaba.core.module.dispenseractions.DispenserActionsModule
 import net.torosaba.core.module.dispenserfallingblock.DispenserFallingBlockModule
+import net.torosaba.core.module.dynmapworldguard.DynmapWorldGuardModule
 import net.torosaba.core.module.effectgui.EffectGuiModule
 import net.torosaba.core.module.hatcolorteam.HatColorTeamModule
 import net.torosaba.core.module.hidenametag.HideNametagModule
@@ -56,5 +57,6 @@ object Modules {
         WorldBorderModule(),
         LiftModule(),
         SeeMoreModule(),
+        DynmapWorldGuardModule(),
     )
 }

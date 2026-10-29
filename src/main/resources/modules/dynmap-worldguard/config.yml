@@ -1,0 +1,58 @@
+# dynmap-worldguard (旧 Dynmap-WorldGuard)
+# WorldGuard の領域を dynmap の地図に描く。キーは元のプラグインと同じ。
+
+update:
+  # 領域を読み直す間隔 (秒)。15 より短くはできない
+  period: 300
+
+layer:
+  # 地図のレイヤーの名前
+  name: "WorldGuard"
+  # true にすると、レイヤーを最初は隠しておく
+  hidebydefault: false
+  # レイヤーの並び順 (小さいほど上)
+  layerprio: 0
+  # このズームより引いているときは描かない (0 = いつも描く)
+  minzoom: 0
+
+# true にすると、領域を高さのある立体として描く
+use3dregions: false
+
+# 領域をクリックしたときの吹き出し。使える値:
+# %regionname% %playerowners% %groupowners% %playermembers% %groupmembers% %parent% %priority% %flags%
+infowindow: '<div class=\"infowindow\"><span style=\"font-size:120%;">%regionname% (%parent%) - %priority%</span><br /> Owners <span style="font-weight:bold;">%playerowners%<br/>%groupowners%</span><br/>Members <span style="font-weight:bold;">%playermembers%<br/>%groupmembers%</span><br/>Flags<br /><span style="font-weight:bold;">%flags%</span></div>'
+
+# 既定の見た目。unownedStrokeColor は持ち主のいない領域の線の色
+regionstyle:
+  strokeColor: "#FF0000"
+  strokeOpacity: 0.8
+  strokeWeight: 3
+  fillColor: "#FF0000"
+  fillOpacity: 0.35
+  unownedStrokeColor: "#00FF00"
+
+# 描く領域を ID で絞る (空ならすべて)。ワールドごと描くときは 'world:<ワールド名>'、
+# ワールドを指定するときは '<ワールド名>/<領域 ID>'
+visibleregions: [ ]
+
+# 描かない領域。書き方は visibleregions と同じ
+hiddenregions: [ ]
+
+# 領域ごとに regionstyle を上書きする。キーは領域 ID か '<ワールド名>/<領域 ID>'。
+# 'abc|xyz' と書くと、ID が abc で始まり xyz で終わる領域に使う。label で地図に出す名前も変えられる
+# 例:
+#   customregion1:
+#     strokeColor: "#00FF00"
+custstyle: { }
+
+# 持ち主 (プレイヤー名・UUID・グループ名) ごとに regionstyle を上書きする。custstyle のほうが優先
+# 例:
+#   kingoftheworld:
+#     strokeColor: "#C0C0C0"
+ownerstyle: { }
+
+# 子の領域を何段目まで描くか (1 = いちばん上の領域だけ)
+maxdepth: 16
+
+# 1 tick に描く領域の数 (多いと重くなる)
+updates-per-tick: 20

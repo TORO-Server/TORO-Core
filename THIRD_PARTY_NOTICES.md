@@ -8,6 +8,10 @@
 | `lift` (`net.torosaba.core.module.lift`) | Lift — https://github.com/croxis/Lift | LGPL-3.0 |
 | `world-border` (`net.torosaba.core.module.worldborder`) | WorldBorder — https://github.com/Brettflan/WorldBorder | BSD-2-Clause |
 | `see-more` (`net.torosaba.core.module.seemore`) | SeeMore — https://github.com/froobynooby/SeeMore | MIT |
+| `dynmap-worldguard` (`net.torosaba.core.module.dynmapworldguard`) | Dynmap-WorldGuard — https://github.com/webbukkit/Dynmap-WorldGuard (Mike Primm) | 表記なし (下を参照) |
+
+Dynmap-WorldGuard のリポジトリにはライセンスの表記が無い。`dynmap-worldguard` は元の設定ファイルをそのまま読めるように
+Kotlin で書き直したもので、元のコードはそのまま含めていない。
 
 LGPL-3.0 のモジュール (`lunachat`, `lift`) を含む JAR をサーバーの外に配布するときは、そのモジュールのソースコード
 (変更を含む) を受け取れるようにし、この表示を残すこと。ライセンスの全文: https://www.gnu.org/licenses/lgpl-3.0.html

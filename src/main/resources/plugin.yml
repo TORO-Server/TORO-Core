@@ -5,7 +5,7 @@ api-version: '26.3'
 description: TORO サーバーの小さな自作プラグインと、開発の止まったプラグインの機能をまとめたもの
 authors: [ marumasa ]
 website: https://torosaba.net
-softdepend: [ LuckPerms, Vault, Essentials, dynmap, Multiverse-Core, floodgate ]
+softdepend: [ LuckPerms, Vault, Essentials, dynmap, Multiverse-Core, floodgate, WorldGuard ]
 
 # モジュールのコマンドは各モジュールが有効になったときに登録する (plugin.yml には書かない)
 commands:

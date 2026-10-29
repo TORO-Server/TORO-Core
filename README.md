@@ -33,10 +33,11 @@ TORO サーバー (torosaba.net, Paper 26.3) の小さな自作プラグイン�
 | `world-border` | WorldBorder (Brettflan) | `/wb` (`/wborder`) |
 | `lift` | Lift (croxis) | `/lift` |
 | `see-more` | SeeMore (froobynooby) | `/seemore` |
+| `dynmap-worldguard` | Dynmap-WorldGuard (webbukkit) | - |
 
 コマンド名・権限ノード・設定のキーは元のプラグインと同じ。
 
-他者製のプラグイン (LunaChat / WorldBorder / Lift / SeeMore) は、TORO で使っている機能だけを作り直している。
+他者製のプラグイン (LunaChat / WorldBorder / Lift / SeeMore / Dynmap-WorldGuard) は、TORO で使っている機能だけを作り直している。
 
 - LunaChat: BungeeCord 連携・mcMMO 連携・他プラグイン向けの API は無い。そのため DiscordSRV の LunaChat 連携 (チャンネルチャットの Discord 転送) は使えない。通常チャットは転送される
 - WorldBorder: `fill` / `trim` (ワールドの事前生成・削除) は無い。Paper や別のプラグインの事前生成を使う
@@ -52,11 +53,12 @@ TORO サーバー (torosaba.net, Paper 26.3) の小さな自作プラグイン�
 外す JAR: `add-parm` `armor_stand` `auto_message` `BanPlayerSheet` `clock` `clock_item_timer` `DispenserActions`
 `dispenser_falling_block` `effect_gui` `HatColorTeam` `hide_nametag_cmd` `InfinityDispense` `InventoryBackup`
 `item_drop_cooldown` `KillPotionDeathLog` `raidwatcher` `report` `skills` `teleport_spectator` `TextBeacon`
-`tps_log` `Warn_KillPotion` `LunaChat` `WorldBorder` `Lift` `SeeMore`
+`tps_log` `Warn_KillPotion` `LunaChat` `WorldBorder` `Lift` `SeeMore` `Dynmap-WorldGuard`
 
 移行の注意:
 
-- LunaChat の本番設定は `lang: en` なので、移した後も英語のメッセージになる。日本語にするなら `lunachat/config.yml` の `lang` を `ja` にする
+- LunaChat の表示言語は `lunachat/config.yml` の `lang` で決まる (TORO-Configs の本番設定は `ja`)。移す前のサーバーの設定が `en` のままなら英語になる
+- `dynmap-worldguard` は WorldGuard の領域のフラグ `dynmap-boost` も登録する。WorldGuard より後に読み込むよう `softdepend` に入れてある
 - InventoryBackup の `restore-command` にある `/inventorybackup:restore` は、自動で `/toro-core:restore` に読み替える
 - WorldBorder の本番の境界 (`worlds:`) は TORO-Configs の公開用設定に入っていないので、サーバーの `plugins/WorldBorder/config.yml` から移ることを確認する
 
@@ -78,7 +80,8 @@ gradle build
 ## 構成
 
 - `src/main/kotlin/net/torosaba/core/` — 本体。`Module` がモジュールの基底クラスで、設定の読み込み・旧フォルダからの移行・
-  リスナー/タスク/コマンド/権限の登録と、停止時の解除を受け持つ。コマンドは plugin.yml に書かず、モジュールが有効になったときに登録する
+  リスナー/タスク/コマンド/権限の登録と、停止時の解除を受け持つ。コマンドは plugin.yml に書かず、モジュールが有効になったときに登録する。
+  ほかのプラグインが有効になる前に済ませること (WorldGuard のフラグの登録など) は `Module.onServerLoad` に書く
 - `src/main/kotlin/net/torosaba/core/module/<モジュール>/` — 各モジュール
 - `src/main/resources/modules/<モジュール id>/` — 各モジュールの既定の設定
 - モジュールを足すときは `Module` を継承したクラスを作り、`Modules.kt` の一覧と `config.yml` の `modules` に加える

@@ -15,6 +15,16 @@ class TOROCore : JavaPlugin() {
 
     val modules: List<Module> by lazy { Modules.create() }
 
+    override fun onLoad() {
+        for (module in modules) {
+            try {
+                module.onServerLoad(this)
+            } catch (e: Throwable) {
+                logger.log(Level.SEVERE, "モジュール ${module.id} の起動前の準備でエラーが起きました", e)
+            }
+        }
+    }
+
     override fun onEnable() {
         saveDefaultConfig()
         commandRegistry = CommandRegistry(this)

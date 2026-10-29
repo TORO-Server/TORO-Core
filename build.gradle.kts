@@ -12,6 +12,7 @@ repositories {
     maven("https://repo.mikeprimm.com/")
     maven("https://repo.essentialsx.net/releases/")
     maven("https://jitpack.io")
+    maven("https://maven.enginehub.org/repo/")
 }
 
 kotlin {
@@ -28,6 +29,9 @@ dependencies {
     compileOnly("net.luckperms:api:5.4")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7.1") { isTransitive = false }
     compileOnly("net.essentialsx:EssentialsX:2.21.2") { isTransitive = false }
+    compileOnly("com.sk89q.worldguard:worldguard-core:7.0.20") { isTransitive = false }
+    compileOnly("com.sk89q.worldguard.worldguard-libs:core:7.0.20") { isTransitive = false }
+    compileOnly("com.sk89q.worldedit:worldedit-core:7.4.6") { isTransitive = false }
 
     testImplementation("io.papermc.paper:paper-api:26.3.build.227-stable")
     testImplementation(kotlin("test-junit5"))
