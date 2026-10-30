@@ -1,0 +1,11 @@
+# dynmap-live: 地図 (map.torosaba.net) にプレイヤーの動きをすぐ出すため、全員の位置と体力を toro-map-web に送る
+# 地図に誰を出すかは dynmap が決める (toro-map-web は dynmap が出しているプレイヤーの位置だけをブラウザに流す)
+
+# 送り先。Docker の中のネットワークの toro-map-web (ServerImage の map-web/) の WebSocket
+endpoint: ws://toro-map-web:3000/live/plugin
+# toro-map-web の NUXT_LIVE_TOKEN と同じ値 (空のときは送らない)
+token: ''
+# 何 tick ごとに送るか (5 tick = 0.25 秒)
+interval-ticks: 5
+# 誰も動いていなくても、この秒数ごとに送る (つながっているか確かめるため)
+heartbeat-seconds: 5

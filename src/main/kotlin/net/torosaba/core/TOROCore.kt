@@ -17,6 +17,8 @@ class TOROCore : JavaPlugin() {
 
     override fun onLoad() {
         for (module in modules) {
+            // 止めたモジュールは読み込まない (元のプラグインと同じ WorldGuard のフラグを登録してぶつかるなど)
+            if (!config.getBoolean("modules.${module.id}", true)) continue
             try {
                 module.onServerLoad(this)
             } catch (e: Throwable) {

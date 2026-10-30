@@ -34,3 +34,5 @@ modules:
   lift: true
   see-more: true
   dynmap-worldguard: true
+  # 新しく作った機能
+  dynmap-live: true
