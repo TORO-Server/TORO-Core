@@ -40,16 +40,17 @@ interface Hovers {
  * 発言 (`%msg`) は最後に別に差し込むので、発言にこの形の文字列があってもクリックできる部分にはならない。
  */
 class ChatFormat(format: String) {
-    private val buf = StringBuilder(format)
+    private val buf = StringBuilder(format.replace("＜", "<").replace("＞", ">"))
     private var message: String = ""
 
     /** [keyword] をすべて [value] に置き換える。置き換えた後の文字列は、もう一度は調べない */
     fun replace(keyword: String, value: String) {
         if (keyword.isEmpty()) return
+        val sanitized = value.replace("＜", "<").replace("＞", ">")
         var index = buf.indexOf(keyword)
         while (index > -1) {
-            buf.replace(index, index + keyword.length, value)
-            index = buf.indexOf(keyword, index + value.length)
+            buf.replace(index, index + keyword.length, sanitized)
+            index = buf.indexOf(keyword, index + sanitized.length)
         }
     }
 

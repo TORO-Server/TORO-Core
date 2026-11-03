@@ -42,7 +42,7 @@ class ClockItemTimerModule : Module("clock-item-timer", "ClockItemTimer"), Liste
         var paused = false
         private val task: BukkitTask = runTimer(1L, 1L) {
             player.sendActionBar(section.deserialize(format(ticks)))
-            if (!paused) ticks++
+            if (!paused && ticks < 20L * 86400L * 365L) ticks++
         }
 
         fun remove() {
@@ -128,7 +128,12 @@ class ClockItemTimerModule : Module("clock-item-timer", "ClockItemTimer"), Liste
     }
 
     private fun format(ticks: Long): String {
-        val seconds = ticks / 20
-        return messages.timer.format(seconds / 3600, seconds % 3600 / 60, seconds % 60, ticks % 20 * 5)
+        val safeTicks = ticks.coerceAtLeast(0L)
+        val seconds = safeTicks / 20
+        return try {
+            messages.timer.format(seconds / 3600, seconds % 3600 / 60, seconds % 60, safeTicks % 20 * 5)
+        } catch (_: Exception) {
+            "%01d:%02d:%02d.%02d".format(seconds / 3600, seconds % 3600 / 60, seconds % 60, safeTicks % 20 * 5)
+        }
     }
 }

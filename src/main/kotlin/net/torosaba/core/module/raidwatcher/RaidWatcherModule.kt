@@ -11,6 +11,8 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.player.AsyncPlayerPreLoginEvent
+import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.permissions.PermissionDefault
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -33,6 +35,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
     private val loginRate = AtomicInteger(0)
     @Volatile private var lockdownEnd = 0L
     private val chatRate = ConcurrentHashMap<UUID, AtomicInteger>()
+    private val onlinePlayerIps = ConcurrentHashMap<UUID, String>()
 
     private val red = TextColor.color(0xFF0000)
 
@@ -53,9 +56,21 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
 
     override fun onDisable() {
         chatRate.clear()
+        onlinePlayerIps.clear()
     }
 
     private inner class WatchListener : Listener {
+        @EventHandler
+        fun onPlayerJoin(event: PlayerJoinEvent) {
+            val ip = event.player.address?.address?.hostAddress ?: event.player.address?.hostString
+            if (ip != null) onlinePlayerIps[event.player.uniqueId] = ip
+        }
+
+        @EventHandler
+        fun onPlayerQuit(event: PlayerQuitEvent) {
+            onlinePlayerIps.remove(event.player.uniqueId)
+        }
+
         // PlayerLoginEvent は廃止予定なので、ログイン前のイベントで判定する。
         // 先に断られたログイン (共有 BAN など) は、元と同じく数えない
         @EventHandler(priority = EventPriority.HIGH)
@@ -65,24 +80,32 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
 
             // 同じ IP で別アカウントの同時参加
             val ip = event.address.hostAddress
-            if (settings.oneIpMultiAccount && Bukkit.getOnlinePlayers().any { it.address?.hostString == ip }) {
+            if (settings.oneIpMultiAccount && onlinePlayerIps.values.any { it == ip }) {
                 event.disallow(
                     AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
                     Component.text("同一IPでの同時ログインは禁止されています。ご確認ください。", red),
                 )
+                return
             }
 
             // 高速複数アカウントログインへの対抗
             val login = settings.login
             if (login.enable) {
-                if (loginRate.get() > login.allowed) parseDateDiff(login.cooldown)?.let { lockdownEnd = it }
                 if (lockdownEnd > System.currentTimeMillis()) {
                     event.disallow(
                         AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
                         Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。"),
                     )
+                    return
                 }
-                loginRate.incrementAndGet()
+                if (loginRate.incrementAndGet() > login.allowed) {
+                    parseDateDiff(login.cooldown)?.let { lockdownEnd = it }
+                    event.disallow(
+                        AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
+                        Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。"),
+                    )
+                    return
+                }
             }
         }
 

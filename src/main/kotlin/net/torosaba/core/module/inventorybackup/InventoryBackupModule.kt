@@ -28,7 +28,7 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
     private val restorable = mutableMapOf<UUID, MutableMap<Int, Array<ItemStack?>>>()
 
     override fun onEnable() {
-        permission("inventory_backup.restore", PermissionDefault.TRUE, "インベントリの復元を許可する権限")
+        permission("inventory_backup.restore", PermissionDefault.OP, "インベントリの復元を許可する権限")
         command(
             "restore",
             permission = "inventory_backup.restore",
@@ -45,8 +45,12 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
     private fun restore(player: Player, args: Array<String>): Boolean {
         if (args.size != 1) return false
         val hash = args[0].toIntOrNull() ?: return false
-        val items = restorable[player.uniqueId]?.get(hash) ?: return false
-        player.inventory.contents = items
+        val items = restorable[player.uniqueId]?.remove(hash) ?: return false
+        if (!player.inventory.contents.allNull()) {
+            player.sendMessage("§cインベントリが空でないため復元できません")
+            return false
+        }
+        player.inventory.contents = items.cloneAll()
         return true
     }
 

@@ -166,6 +166,10 @@ internal class BeaconCommand(private val module: TextBeaconModule) {
             sender.sendMessage("§7\\nで改行できます")
             return
         }
+        if (content.length > 256) {
+            sender.sendMessage("§cメッセージは256文字以内にしてください")
+            return
+        }
 
         val item = ItemStack(Material.OAK_SIGN, 1)
         val meta = item.itemMeta as? BlockStateMeta

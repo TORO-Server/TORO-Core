@@ -19,7 +19,8 @@ class HideNametagModule : Module("hide-nametag", "HideNametagCMD") {
 
         team()
 
-        command("nttoggle", description = "Name tag display switching command") { sender, _, _ ->
+        permission("hidenametag.use", org.bukkit.permissions.PermissionDefault.OP, "ネームタグ非表示を使う")
+        command("nttoggle", permission = "hidenametag.use", description = "Name tag display switching command") { sender, _, _ ->
             if (sender !is Player) {
                 sender.sendMessage("§cプレイヤーだけが使えるコマンドです")
                 return@command true

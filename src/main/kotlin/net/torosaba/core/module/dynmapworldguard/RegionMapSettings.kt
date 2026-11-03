@@ -114,16 +114,29 @@ internal class RegionMapSettings(config: ConfigurationSection) {
             ?: region.ownerGroups.firstNotNullOfOrNull { ownerStyles[it.lowercase()] }
             ?: defaultStyle
 
+    private fun escapeHtml(text: String): String = buildString(text.length + 16) {
+        for (c in text) {
+            when (c) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&#39;")
+                else -> append(c)
+            }
+        }
+    }
+
     fun formatInfoWindow(info: RegionInfo): String =
         "<div class=\"regioninfo\">$infoWindow</div>"
-            .replace("%regionname%", info.label)
-            .replace("%playerowners%", info.playerOwners)
-            .replace("%groupowners%", info.groupOwners)
-            .replace("%playermembers%", info.playerMembers)
-            .replace("%groupmembers%", info.groupMembers)
-            .replace("%parent%", info.parent ?: "")
+            .replace("%regionname%", escapeHtml(info.label))
+            .replace("%playerowners%", escapeHtml(info.playerOwners))
+            .replace("%groupowners%", escapeHtml(info.groupOwners))
+            .replace("%playermembers%", escapeHtml(info.playerMembers))
+            .replace("%groupmembers%", escapeHtml(info.groupMembers))
+            .replace("%parent%", escapeHtml(info.parent ?: ""))
             .replace("%priority%", info.priority.toString())
-            .replace("%flags%", info.flags.joinToString("") { (name, value) -> "$name: $value<br/>" })
+            .replace("%flags%", info.flags.joinToString("") { (name, value) -> "${escapeHtml(name)}: ${escapeHtml(value)}<br/>" })
 
     companion object {
         const val DEFAULT_INFOWINDOW = "<div class=\"infowindow\"><span style=\"font-size:120%;\">%regionname%</span><br /> " +

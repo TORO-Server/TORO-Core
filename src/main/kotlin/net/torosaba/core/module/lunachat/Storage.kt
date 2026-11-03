@@ -1,7 +1,9 @@
 package net.torosaba.core.module.lunachat
 
 import org.yaml.snakeyaml.DumperOptions
+import org.yaml.snakeyaml.LoaderOptions
 import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.constructor.SafeConstructor
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -16,7 +18,7 @@ internal object FlatYaml {
     fun load(file: File, onError: (Exception) -> Unit = {}): Map<String, Any?> {
         if (!file.isFile || file.length() == 0L) return emptyMap()
         return try {
-            val data = file.reader(Charsets.UTF_8).use { Yaml().load<Any?>(it) }
+            val data = file.reader(Charsets.UTF_8).use { Yaml(SafeConstructor(LoaderOptions())).load<Any?>(it) }
             (data as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: emptyMap()
         } catch (e: Exception) {
             onError(e)
@@ -46,6 +48,7 @@ internal class ChatLogger(private val dataFolder: File, private val name: String
     fun log(message: String, player: String) {
         val now = Date()
         val file = File(folder(now), "$name.log")
+        file.parentFile?.mkdirs()
         val msg = Colors.strip(message).replace(",", "，")
         val line = lineFormat.format(now) + "," + msg + "," + player + "\r\n"
         // 発言の処理を重くしないよう、書き込みは別スレッドで行う (LunaChat issue #40)

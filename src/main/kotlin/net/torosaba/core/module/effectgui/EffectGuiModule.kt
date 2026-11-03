@@ -30,7 +30,8 @@ class EffectGuiModule : Module("effect-gui", "Effect_GUI") {
     private val states = mutableMapOf<UUID, PlayerState>()
 
     override fun onEnable() {
-        command("effectgui", description = "エフェクトのGUIを表示する") { sender, _, _ ->
+        permission("effectgui.use", org.bukkit.permissions.PermissionDefault.OP, "エフェクトGUIを使う")
+        command("effectgui", permission = "effectgui.use", description = "エフェクトのGUIを表示する") { sender, _, _ ->
             if (sender !is Player) {
                 sender.sendMessage("§cプレイヤーのみ実行できます")
                 return@command true
