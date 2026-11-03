@@ -40,7 +40,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
     /** 1:1 チャットの相手 */
     var privateMessageTo: ChannelMember? = null
 
-    private val logger = ChatLogger(lc.dataFolder, name.replace(">", "-").replace("*", "_"), lc.logWriter)
+    private val logger = ChatLogger(lc.dataFolder, if (name.contains(">")) "pm/" + name.replace(">", "-") else name.replace("*", "_"), lc.logWriter)
 
     private val settings get() = lc.settings
     private val messages get() = lc.messages

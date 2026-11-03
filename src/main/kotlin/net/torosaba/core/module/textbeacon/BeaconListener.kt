@@ -1,12 +1,14 @@
 package net.torosaba.core.module.textbeacon
 
 import net.kyori.adventure.text.Component
+import org.bukkit.GameMode
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.block.Sign
 import org.bukkit.block.sign.Side
 import org.bukkit.block.sign.SignSide
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
@@ -43,7 +45,7 @@ internal class BeaconListener(private val module: TextBeaconModule) : Listener {
         module.tryRegisterBeacon(e.player, e.block.location, buildMessage(lines))
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onPlace(e: BlockPlaceEvent) {
         val sign = e.blockPlaced.state as? Sign ?: return
         if (!e.player.hasPermission("textbeacon.create")) {
@@ -55,6 +57,9 @@ internal class BeaconListener(private val module: TextBeaconModule) : Listener {
         if (!itemMessage.isNullOrBlank()) {
             // 看板の中身はサーバーが書く (OP 以外はアイテムの看板データが反映されないため)
             e.isCancelled = true
+            if (e.player.gameMode != GameMode.CREATIVE) {
+                e.itemInHand.amount -= 1
+            }
             placeBeaconSign(e, sign.location, itemMessage)
             return
         }

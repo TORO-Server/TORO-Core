@@ -120,5 +120,5 @@ class BanPlayerSheetModule : Module("ban-player-sheet", "BanPlayerSheet") {
     }
 
     private fun playerNames(): List<String> =
-        (Bukkit.getOfflinePlayers().mapNotNull { it.name } + Bukkit.getOnlinePlayers().map { it.name }).distinct()
+        Bukkit.getOnlinePlayers().map { it.name }.sorted()
 }

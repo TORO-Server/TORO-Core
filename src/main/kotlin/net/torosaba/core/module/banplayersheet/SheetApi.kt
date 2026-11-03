@@ -20,13 +20,13 @@ internal class SheetApi(private val logger: Logger) {
     // GAS は応答をリダイレクトで返すので、リダイレクトをたどる
     private val client = HttpClient.newBuilder()
         .followRedirects(HttpClient.Redirect.NORMAL)
-        .connectTimeout(Duration.ofSeconds(10))
+        .connectTimeout(Duration.ofSeconds(5))
         .build()
 
     /** JSON を POST して、応答を JSON として返す。通信できないか JSON でなければ null */
     fun post(url: String, body: JsonObject): JsonObject? = try {
         val request = HttpRequest.newBuilder(URI(url))
-            .timeout(Duration.ofSeconds(30))
+            .timeout(Duration.ofSeconds(5))
             .header("Content-Type", "application/json; utf-8")
             .header("Accept", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(body.toString(), Charsets.UTF_8))

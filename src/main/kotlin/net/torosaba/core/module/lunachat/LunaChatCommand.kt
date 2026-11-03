@@ -284,7 +284,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
 
         val logs: List<String>
         if (settings.globalChannel.isEmpty() && (cname == null || cname == settings.globalMarker)) {
-            logs = lc.normalChatLogger.read(player, filter, date, reverse)
+            logs = lc.normalChatLogger.read(player, filter, date, reverse).takeLast(100)
             cname = "GlobalChat"
         } else {
             val channel = manager.getChannel(cname)
@@ -300,7 +300,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
                 sender.error("errmsgNomember")
                 return
             }
-            logs = channel.readLog(player, filter, date, reverse)
+            logs = channel.readLog(player, filter, date, reverse).takeLast(100)
         }
 
         sender.plain("logDisplayFirstLine", "channel" to (cname ?: ""))

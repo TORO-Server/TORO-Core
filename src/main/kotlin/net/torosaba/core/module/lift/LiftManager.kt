@@ -31,6 +31,9 @@ internal class LiftManager(private val module: LiftModule) {
     /** 乗る前から飛べたプレイヤー (降りたあとも飛べるままにする) */
     private val fliers = HashSet<UUID>()
 
+    private class OriginalState(val allowFlight: Boolean, val hasGravity: Boolean)
+    private val originalStates = java.util.concurrent.ConcurrentHashMap<UUID, OriginalState>()
+
     // ---- 調べる ----
 
     fun isBaseBlock(block: Block) = block.type in settings.blockSpeeds
@@ -219,15 +222,22 @@ internal class LiftManager(private val module: LiftModule) {
 
     /** 動いている間に飛行で蹴られないよう、重力を切って飛行を許す */
     private fun setupPlayer(player: Player) {
+        originalStates.putIfAbsent(player.uniqueId, OriginalState(player.allowFlight, player.hasGravity()))
         if (player.allowFlight) fliers += player.uniqueId else fliers -= player.uniqueId
         player.setGravity(false)
         player.allowFlight = true
     }
 
     private fun restorePlayer(player: Player) {
-        player.setGravity(true)
         fallers -= player.uniqueId
-        if (!fliers.remove(player.uniqueId)) player.allowFlight = false
+        val state = originalStates.remove(player.uniqueId)
+        if (state != null) {
+            player.setGravity(state.hasGravity)
+            player.allowFlight = state.allowFlight
+        } else {
+            player.setGravity(true)
+            if (!fliers.remove(player.uniqueId)) player.allowFlight = false
+        }
     }
 
     // ---- 毎 tick ----
@@ -355,9 +365,15 @@ internal class LiftManager(private val module: LiftModule) {
 
     /** 1 つのものをエレベーターから降ろす (昇降路を出た・拾われた・ログアウトしたなど) */
     fun release(entity: Entity) {
-        val e = elevators.find { it.isInLift(entity) } ?: return
-        e.remove(entity)
-        restore(entity)
+        val e = elevators.find { it.isInLift(entity) || (entity is Player && entity.vehicle != null && it.isInLift(entity.vehicle!!)) }
+        if (e != null) {
+            e.remove(entity)
+            restore(entity)
+            return
+        }
+        if (entity is Player && originalStates.containsKey(entity.uniqueId)) {
+            restorePlayer(entity)
+        }
     }
 
     private fun restore(entity: Entity) {
@@ -365,6 +381,7 @@ internal class LiftManager(private val module: LiftModule) {
         entity.fallDistance = 0f
         entity.setGravity(true)
         if (entity is Player) restorePlayer(entity)
+        if (entity is Vehicle) entity.passengers.filterIsInstance<Player>().forEach(::restorePlayer)
     }
 
     /** 落下ダメージを消すなら true (1 回だけ) */
@@ -379,6 +396,13 @@ internal class LiftManager(private val module: LiftModule) {
         elevators.clear()
         fallers.clear()
         fliers.clear()
+        for ((uuid, state) in originalStates) {
+            org.bukkit.Bukkit.getPlayer(uuid)?.let {
+                it.setGravity(state.hasGravity)
+                it.allowFlight = state.allowFlight
+            }
+        }
+        originalStates.clear()
     }
 
     companion object {

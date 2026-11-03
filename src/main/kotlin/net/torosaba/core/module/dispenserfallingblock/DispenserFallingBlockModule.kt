@@ -30,16 +30,20 @@ class DispenserFallingBlockModule : Module("dispenser-falling-block", "Dispenser
         val location = block.location.add(0.5, 0.0, 0.5)
         if (facing != null) location.add(facing.modX.toDouble(), facing.modY.toDouble(), facing.modZ.toDouble())
 
+        val targetBlock = location.block
+        if (!targetBlock.isPassable && !targetBlock.isEmpty) return
+
         if (config.getBoolean("Consume")) {
             val inventory = dispenser.inventory
-            // キャンセルしたぶん、次の tick に同じアイテムを 1 つ減らす
-            runLater(0) {
-                val slots = inventory.contents.indices.filter { inventory.getItem(it)?.type == type }
-                if (slots.isEmpty()) return@runLater
-                val slot = slots.random()
-                val item = inventory.getItem(slot) ?: return@runLater
+            val slots = inventory.contents.indices.filter { inventory.getItem(it)?.type == type }
+            if (slots.isEmpty()) return
+            val slot = slots.first()
+            val item = inventory.getItem(slot) ?: return
+            if (item.amount <= 1) {
+                inventory.setItem(slot, null)
+            } else {
                 item.amount -= 1
-                inventory.setItem(slot, item.takeIf { it.amount > 0 })
+                inventory.setItem(slot, item)
             }
         }
         block.world.spawn(location, FallingBlock::class.java) { it.blockData = type.createBlockData() }
