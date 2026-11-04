@@ -116,8 +116,8 @@ class ReportModule : Module("report", "Report") {
 
     private fun openPlayerMenu(p: Player) {
         val inv = ReportMenu(Menu.PLAYER).inventory
-        // 53 番目は「ここにいない」に使う
-        Bukkit.getOnlinePlayers().take(53).forEachIndexed { slot, target -> inv.setItem(slot, head(target)) }
+        // 53 番目は「ここにいない」に使う。見えない人 (vanish 中など) は出さない
+        Bukkit.getOnlinePlayers().filter { p.canSee(it) }.take(53).forEachIndexed { slot, target -> inv.setItem(slot, head(target)) }
         inv.setItem(53, item(Material.YELLOW_CONCRETE, "ここにいない"))
         p.openInventory(inv)
     }

@@ -2,6 +2,7 @@ package net.torosaba.core.module.report
 
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import net.torosaba.core.Discord
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -20,27 +21,10 @@ internal class WebhookSender(private val webhookUrl: String, private val logger:
             return
         }
         try {
-            val fields = JsonArray().apply {
-                add(field("通報者", reporter, true))
-                add(field("対象", target, true))
-                add(field("座標", coords, true))
-                add(field("理由", reason, false))
-                if (!detail.isNullOrEmpty()) add(field("詳細", detail, false))
-            }
-            val embed = JsonObject().apply {
-                addProperty("title", "新規通報")
-                addProperty("color", 16711680) // 赤
-                add("fields", fields)
-            }
-            val root = JsonObject().apply {
-                addProperty("username", "通報")
-                add("embeds", JsonArray().apply { add(embed) })
-            }
-
             val request = HttpRequest.newBuilder(URI(webhookUrl))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(root.toString(), Charsets.UTF_8))
+                .POST(HttpRequest.BodyPublishers.ofString(payload(reporter, target, reason, detail, coords).toString(), Charsets.UTF_8))
                 .build()
             val response = client.send(request, HttpResponse.BodyHandlers.ofString(Charsets.UTF_8))
             val code = response.statusCode()
@@ -53,9 +37,33 @@ internal class WebhookSender(private val webhookUrl: String, private val logger:
         }
     }
 
-    private fun field(name: String, value: String?, inline: Boolean) = JsonObject().apply {
-        addProperty("name", name)
-        addProperty("value", value ?: "")
-        if (inline) addProperty("inline", true)
+    companion object {
+        /** 通報の JSON。プレイヤーが決める文字列は Markdown を無害化し、Discord の上限に収める */
+        fun payload(reporter: String, target: String?, reason: String?, detail: String?, coords: String): JsonObject {
+            val fields = JsonArray().apply {
+                add(field("通報者", Discord.escape(reporter), true))
+                add(field("対象", target?.let(Discord::escape), true))
+                add(field("座標", coords, true))
+                add(field("理由", reason?.let(Discord::escape), false))
+                if (!detail.isNullOrEmpty()) add(field("詳細", Discord.escape(detail), false))
+            }
+            val embed = JsonObject().apply {
+                addProperty("title", "新規通報")
+                addProperty("color", 16711680) // 赤
+                add("fields", fields)
+            }
+            return JsonObject().apply {
+                addProperty("username", "通報")
+                add("embeds", JsonArray().apply { add(embed) })
+                add("allowed_mentions", Discord.noMentions())
+            }
+        }
+
+        // 値が空のフィールドは Discord に拒否されるので、何か入れる
+        private fun field(name: String, value: String?, inline: Boolean) = JsonObject().apply {
+            addProperty("name", Discord.truncate(name, Discord.MAX_FIELD_NAME))
+            addProperty("value", Discord.truncate(value?.takeIf { it.isNotBlank() } ?: "-", Discord.MAX_FIELD_VALUE))
+            if (inline) addProperty("inline", true)
+        }
     }
 }
