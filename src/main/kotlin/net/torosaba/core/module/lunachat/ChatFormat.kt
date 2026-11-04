@@ -36,35 +36,50 @@ interface Hovers {
  * LunaChat の ClickableFormat。フォーマットのキーワード (`%ch` `%displayname` など) を置き換え、
  * チャンネル名やプレイヤー名をクリックできる Component にする。
  *
- * クリックできる部分は、置き換えの途中では `＜type=... text="..." hover="..." command="..."＞` の形で文字列に埋め込む。
- * 発言 (`%msg`) は最後に別に差し込むので、発言にこの形の文字列があってもクリックできる部分にはならない。
+ * クリックできる部分の中身は [links] に持ち、文字列には私用領域の文字の目印 (`LINK_START` 番号 `LINK_END`) だけを埋め込む。
+ * フォーマットと置き換える値からは目印の文字を取り除くので、目印を作れるのはこのクラスだけになる。
+ * 発言 (`%msg`) は最後に別に差し込むので、発言の中身はクリックできる部分にならない。
  */
 class ChatFormat(format: String) {
-    private val buf = StringBuilder(format.replace("＜", "<").replace("＞", ">"))
+    private class Link(val run: Boolean, val text: String, val hover: String, val command: String) {
+        fun clickEvent(): ClickEvent<*> = if (run) ClickEvent.runCommand(command) else ClickEvent.suggestCommand(command)
+    }
+
+    private val buf = StringBuilder(format.withoutMarkers())
+    private val links = ArrayList<Link>()
     private var message: String = ""
 
     /** [keyword] をすべて [value] に置き換える。置き換えた後の文字列は、もう一度は調べない */
-    fun replace(keyword: String, value: String) {
+    fun replace(keyword: String, value: String) = replaceRaw(keyword, value.withoutMarkers())
+
+    /** 目印を取り除かずに置き換える。[value] はこのクラスで作った目印だけにする */
+    private fun replaceRaw(keyword: String, value: String) {
         if (keyword.isEmpty()) return
-        val sanitized = value.replace("＜", "<").replace("＞", ">")
         var index = buf.indexOf(keyword)
         while (index > -1) {
-            buf.replace(index, index + keyword.length, sanitized)
-            index = buf.indexOf(keyword, index + sanitized.length)
+            buf.replace(index, index + keyword.length, value)
+            index = buf.indexOf(keyword, index + value.length)
         }
+    }
+
+    /** [keyword] をクリックできる部分にする */
+    private fun replaceLink(keyword: String, link: Link) {
+        if (!contains(keyword)) return
+        links += link
+        replaceRaw(keyword, "$LINK_START${links.lastIndex}$LINK_END")
     }
 
     fun contains(keyword: String): Boolean = buf.indexOf(keyword) > -1
 
     /** `%msg` に発言を入れる */
     fun setMessage(message: String) {
-        replace("%msg", MESSAGE_TOKEN)
+        replaceRaw("%msg", MESSAGE_TOKEN)
         this.message = message
     }
 
     /** そのままの文字列 (クリック部分は文字だけにし、色コード候補は `§` にする) */
     fun toLegacyText(): String {
-        val text = placeholder.replace(Colors.replace(buf.toString())) { it.groupValues[2] }
+        val text = linkToken.replace(Colors.replace(buf.toString())) { Colors.replace(linkOf(it).text) }
         return text.replace(MESSAGE_TOKEN, message)
     }
 
@@ -77,14 +92,14 @@ class ChatFormat(format: String) {
         // クリック部分の色は、直前の部分の色に合わせる (LunaChat issue #202)
         var lastColor: TextColor? = null
         var lastIndex = 0
-        for (match in placeholder.findAll(text)) {
+        for (match in linkToken.findAll(text)) {
             if (lastIndex < match.range.first) {
                 lastColor = appendLiteral(root, text.substring(lastIndex, match.range.first))
             }
-            val (type, label, hover, command) = match.destructured
-            val click = Component.text().append(Colors.component(label))
-            if (hover.isNotEmpty()) click.hoverEvent(HoverEvent.showText(Colors.component(hover)))
-            click.clickEvent(if (type == "RUN_COMMAND") ClickEvent.runCommand(command) else ClickEvent.suggestCommand(command))
+            val link = linkOf(match)
+            val click = Component.text().append(Colors.component(Colors.replace(link.text)))
+            if (link.hover.isNotEmpty()) click.hoverEvent(HoverEvent.showText(Colors.component(Colors.replace(link.hover))))
+            click.clickEvent(link.clickEvent())
             if (lastColor != null) click.color(lastColor)
             root.append(click.build())
             lastIndex = match.range.last + 1
@@ -92,6 +107,8 @@ class ChatFormat(format: String) {
         if (lastIndex < text.length) appendLiteral(root, text.substring(lastIndex))
         return root.build()
     }
+
+    private fun linkOf(match: MatchResult): Link = links[match.groupValues[1].toInt()]
 
     /** 文字の部分を足して、最後の色 (無ければ白) を返す。色の状態は発言の前後で引き継ぐ */
     private fun appendLiteral(root: TextComponent.Builder, literal: String): TextColor {
@@ -116,14 +133,19 @@ class ChatFormat(format: String) {
         /** 発言を入れる場所の目印 (私用領域の文字) */
         private const val MESSAGE_TOKEN = ""
 
-        private val placeholder =
-            Regex("＜type=(SUGGEST_COMMAND|RUN_COMMAND) text=\"([^\"]*)\" hover=\"([^\"]*)\" command=\"([^\"]*)\"＞")
+        /** クリックできる部分の目印 (私用領域の文字)。間に [links] の番号が入る */
+        private const val LINK_START = ""
+        private const val LINK_END = ""
 
-        private fun runCommand(text: String, hover: String, command: String) =
-            "＜type=RUN_COMMAND text=\"$text\" hover=\"$hover\" command=\"$command\"＞"
+        private val markers = charArrayOf('', '', '')
+        private val linkToken = Regex("$LINK_START([0-9]+)$LINK_END")
 
-        private fun suggestCommand(text: String, hover: String, command: String) =
-            "＜type=SUGGEST_COMMAND text=\"$text\" hover=\"$hover\" command=\"$command\"＞"
+        /** 外から来た文字列が内部の目印にならないよう、目印の文字を取り除く */
+        private fun String.withoutMarkers(): String = if (indexOfAny(markers) < 0) this else filterNot { it in markers }
+
+        private fun runCommand(text: String, hover: String, command: String) = Link(true, text, hover, command)
+
+        private fun suggestCommand(text: String, hover: String, command: String) = Link(false, text, hover, command)
 
         /**
          * フォーマットのキーワードを置き換える。
@@ -151,10 +173,10 @@ class ChatFormat(format: String) {
                     msg.replace(key, template)
                     break
                 }
-                msg.replace("%ch", runCommand(channel.name, hovers.channel(channel.name), "/lunachat join ${channel.name}"))
+                msg.replaceLink("%ch", runCommand(channel.name, hovers.channel(channel.name), "/lunachat join ${channel.name}"))
                 msg.replace("%color", channel.color)
                 channel.to?.let { to ->
-                    msg.replace("%to", suggestCommand(to.displayName, hovers.player(to.name), "/tell ${to.name}"))
+                    msg.replaceLink("%to", suggestCommand(to.displayName, hovers.player(to.name), "/tell ${to.name}"))
                     msg.replace("%recieverserver", to.server)
                 }
             }
@@ -165,9 +187,9 @@ class ChatFormat(format: String) {
             if (member != null) {
                 if (withPlayerLink) {
                     val link = suggestCommand(member.displayName, hovers.player(member.name), "/tell ${member.name}")
-                    msg.replace("%displayname", link)
-                    msg.replace("%username", link)
-                    msg.replace("%player", suggestCommand(member.name, hovers.player(member.name), "/tell ${member.name}"))
+                    msg.replaceLink("%displayname", link)
+                    msg.replaceLink("%username", link)
+                    msg.replaceLink("%player", suggestCommand(member.name, hovers.player(member.name), "/tell ${member.name}"))
                 } else {
                     msg.replace("%displayname", member.displayName)
                     msg.replace("%username", member.displayName)
@@ -187,7 +209,7 @@ class ChatFormat(format: String) {
         fun channelMessage(format: String, channelName: String, hovers: Hovers): ChatFormat {
             val msg = ChatFormat(format)
             val stripped = Colors.strip(channelName)
-            msg.replace("%channel%", runCommand(channelName, hovers.channel(stripped), "/lunachat join $stripped"))
+            msg.replaceLink("%channel%", runCommand(channelName, hovers.channel(stripped), "/lunachat join $stripped"))
             return msg
         }
 

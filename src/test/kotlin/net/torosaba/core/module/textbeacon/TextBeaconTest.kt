@@ -4,12 +4,22 @@ import org.bukkit.configuration.file.YamlConfiguration
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TextBeaconTest {
+    @Test
+    fun onlyBeaconSignsAreHandled() {
+        // 普通の看板は TextBeacon の処理 (権限のメッセージを含む) の対象にしない
+        assertFalse(isBeaconSign(null, ""))
+        assertFalse(isBeaconSign("  ", "看板"))
+        assertTrue(isBeaconSign(null, "[textbeacon]"))
+        assertTrue(isBeaconSign("やあ", ""))
+    }
+
     @Test
     fun colorCodes() {
         assertEquals("§aHello §lWorld", colorize("&aHello &LWorld"))

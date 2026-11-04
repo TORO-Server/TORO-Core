@@ -12,6 +12,7 @@ import org.bukkit.block.Block
 import org.bukkit.block.Sign
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
+import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.permissions.PermissionDefault
 import org.bukkit.util.BoundingBox
 import java.io.File
@@ -98,11 +99,15 @@ class TextBeaconModule : Module("text-beacon", "TextBeacon") {
             player.sendMessage("§cガラスの範囲は5x5x5以内にしてください")
             return false
         }
+        val blocks = glass.map { (x, y, z) -> world.getBlockAt(x, y, z) }
+        if (!blocks.all { canBreak(player, it) }) {
+            player.sendMessage("§c保護されているガラスが含まれているため、Beaconを設置できません")
+            return false
+        }
 
         val beacon = Beacon(UUID.randomUUID(), BlockKey(base), msg, player.uniqueId, player.name)
-        for ((x, y, z) in glass) {
-            beacon.blocks += BlockKey(world.name, x, y, z)
-            val block = world.getBlockAt(x, y, z)
+        for (block in blocks) {
+            beacon.blocks += BlockKey(block.location)
             playBreakEffect(block)
             block.type = Material.AIR
         }
@@ -110,6 +115,13 @@ class TextBeaconModule : Module("text-beacon", "TextBeacon") {
         player.sendMessage("§aBeaconを設置しました: ${glass.size}ブロック")
         scheduleSave()
         return true
+    }
+
+    /** [player] が [block] を壊してよいか。保護プラグインに判断してもらうため、通常の破壊と同じイベントを出す */
+    private fun canBreak(player: Player, block: Block): Boolean {
+        val event = BlockBreakEvent(block, player)
+        Bukkit.getPluginManager().callEvent(event)
+        return !event.isCancelled
     }
 
     /** Beacon を消す。[destroyWorldBlocks] なら看板と範囲のブロックも壊す */

@@ -27,12 +27,17 @@ internal fun SignSide.writeBeacon(lines: List<String>) {
     lines.forEachIndexed { i, s -> line(i + 1, signText.deserialize(s)) }
 }
 
+/** 設置した看板が TextBeacon の看板か (メッセージ入りのアイテムか、1 行目が見出し) */
+internal fun isBeaconSign(itemMessage: String?, firstLine: String): Boolean =
+    !itemMessage.isNullOrBlank() || SIGN_HEADER.equals(firstLine, ignoreCase = true)
+
 internal class BeaconListener(private val module: TextBeaconModule) : Listener {
     private val registry get() = module.registry
 
     // ---- 看板の設置 ----
 
-    @EventHandler
+    // 保護プラグインなどが取り消した編集では登録しない
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onSign(e: SignChangeEvent) {
         if (!e.line(0).signLine().equals(SIGN_HEADER, ignoreCase = true)) return
         if (!e.player.hasPermission("textbeacon.create")) {
@@ -48,12 +53,15 @@ internal class BeaconListener(private val module: TextBeaconModule) : Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onPlace(e: BlockPlaceEvent) {
         val sign = e.blockPlaced.state as? Sign ?: return
+        val itemMessage = itemMessage(e.itemInHand)
+        val front = sign.getSide(Side.FRONT)
+        // 普通の看板には何もしない (権限のメッセージも出さない)
+        if (!isBeaconSign(itemMessage, front.line(0).signLine())) return
         if (!e.player.hasPermission("textbeacon.create")) {
             e.player.sendMessage("§cこの操作を行う権限がありません (textbeacon.create)")
             return
         }
 
-        val itemMessage = itemMessage(e.itemInHand)
         if (!itemMessage.isNullOrBlank()) {
             // 看板の中身はサーバーが書く (OP 以外はアイテムの看板データが反映されないため)
             e.isCancelled = true
@@ -64,8 +72,6 @@ internal class BeaconListener(private val module: TextBeaconModule) : Listener {
             return
         }
 
-        val front = sign.getSide(Side.FRONT)
-        if (!SIGN_HEADER.equals(front.line(0).signLine(), ignoreCase = true)) return
         if (BlockKey(sign.location) in registry.signs) return
         module.tryRegisterBeacon(e.player, sign.location, buildMessage(front.lines().map { it.signLine() }))
     }
