@@ -13,6 +13,7 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ShapedRecipe
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.scheduler.BukkitTask
@@ -28,9 +29,13 @@ class SkillsModule : Module("skills", "Skills") {
     internal val states = HashMap<UUID, SkillState>()
     private lateinit var grappleKey: NamespacedKey
 
+    /** クラスの道具に付ける印。値はクラスの名前 */
+    private lateinit var skillItemKey: NamespacedKey
+
     override fun onEnable() {
         states.clear()
         grappleKey = NamespacedKey(plugin, "grappling_hook")
+        skillItemKey = NamespacedKey(plugin, "skill_item")
         registerGrappleRecipe()
         listen(SkillListener(this))
         permission("skills.use", org.bukkit.permissions.PermissionDefault.OP, "スキルGUIを使う")
@@ -150,13 +155,14 @@ class SkillsModule : Module("skills", "Skills") {
 
     internal fun select(player: Player, skill: Skill?) {
         resetPlayer(player)
-        if (skill != null) states[player.uniqueId] = SkillState(skill)
-        val inv = player.inventory
+        if (skill != null) {
+            states[player.uniqueId] = SkillState(skill)
+            giveSkillItem(player, skill)
+        }
         when (skill) {
             Skill.ACROBAT -> player.sendMessage("§bアクロバットを選択しました")
             Skill.SCOUT -> {
                 player.addPotionEffect(PotionEffect(PotionEffectType.SPEED, PotionEffect.INFINITE_DURATION, 0, false, false))
-                inv.addItem(unbreakableGrapple())
                 player.sendMessage("§aスカウトを選択しました")
             }
             Skill.GUARDIAN -> {
@@ -164,22 +170,10 @@ class SkillsModule : Module("skills", "Skills") {
                 player.addPotionEffect(PotionEffect(PotionEffectType.REGENERATION, PotionEffect.INFINITE_DURATION, 0, false, false))
                 player.sendMessage("§eガーディアンを選択しました")
             }
-            Skill.BLINK -> {
-                inv.addItem(ItemStack(Material.FEATHER))
-                player.sendMessage("§bブリンクを選択しました")
-            }
-            Skill.BLAST -> {
-                inv.addItem(ItemStack(Material.TNT_MINECART))
-                player.sendMessage("§eブラストパックを選択しました")
-            }
-            Skill.TELEPORT -> {
-                inv.addItem(ItemStack(Material.ENDER_PEARL))
-                player.sendMessage("§dテレポートを選択しました")
-            }
-            Skill.DASH -> {
-                inv.addItem(ItemStack(Material.BLAZE_ROD))
-                player.sendMessage("§6ダッシュを選択しました")
-            }
+            Skill.BLINK -> player.sendMessage("§bブリンクを選択しました")
+            Skill.BLAST -> player.sendMessage("§eブラストパックを選択しました")
+            Skill.TELEPORT -> player.sendMessage("§dテレポートを選択しました")
+            Skill.DASH -> player.sendMessage("§6ダッシュを選択しました")
             null -> player.sendMessage("§c能力をリセットしました")
         }
         player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1f, 1f)
@@ -190,7 +184,40 @@ class SkillsModule : Module("skills", "Skills") {
         player.getAttribute(Attribute.MAX_HEALTH)?.baseValue = 20.0
         player.removePotionEffect(PotionEffectType.SPEED)
         player.removePotionEffect(PotionEffectType.REGENERATION)
+        removeSkillItems(player)
         states.remove(player.uniqueId)?.let { discard(it) }
+    }
+
+    // ---- クラスの道具 ----
+
+    /** クラスの道具を持っていないときだけ、印を付けて 1 つ渡す (選び直しても増えないように) */
+    internal fun giveSkillItem(player: Player, skill: Skill) {
+        val item = when (skill) {
+            Skill.SCOUT -> unbreakableGrapple()
+            Skill.BLINK -> ItemStack(Material.FEATHER)
+            Skill.BLAST -> ItemStack(Material.TNT_MINECART)
+            Skill.TELEPORT -> ItemStack(Material.ENDER_PEARL)
+            Skill.DASH -> ItemStack(Material.BLAZE_ROD)
+            Skill.ACROBAT, Skill.GUARDIAN -> return
+        }
+        if (player.inventory.contents.any { isSkillItem(it) }) return
+        item.editMeta { it.persistentDataContainer.set(skillItemKey, PersistentDataType.STRING, skill.name) }
+        player.inventory.addItem(item)
+    }
+
+    /** アイテムに付いている、クラスの道具の印 (クラスの名前)。印が無ければ null */
+    internal fun skillItemOwner(item: ItemStack?): String? {
+        if (item == null || item.isEmpty || !item.hasItemMeta()) return null
+        return item.itemMeta.persistentDataContainer.get(skillItemKey, PersistentDataType.STRING)
+    }
+
+    internal fun isSkillItem(item: ItemStack?): Boolean = skillItemOwner(item) != null
+
+    /** クラスの道具を全部回収する */
+    private fun removeSkillItems(player: Player) {
+        val inv = player.inventory
+        inv.contents.forEachIndexed { slot, item -> if (isSkillItem(item)) inv.setItem(slot, null) }
+        if (isSkillItem(player.itemOnCursor)) player.setItemOnCursor(null)
     }
 
     /** ワールドに出しているビーコンやブラストパックを片付ける */
