@@ -6,13 +6,40 @@ plugins {
 group = "net.torosaba"
 version = "1.0.0"
 
+// 各リポジトリから取るグループを限定する。Maven Central を最後にして、下のグループは先に専用のリポジトリを見る
 repositories {
+    maven("https://repo.papermc.io/repository/maven-public/") {
+        content {
+            includeGroup("io.papermc.paper")
+            includeGroup("com.mojang")
+            includeGroup("net.md-5")
+        }
+    }
+    maven("https://repo.mikeprimm.com/") {
+        content {
+            includeGroup("us.dynmap")
+        }
+    }
+    maven("https://repo.essentialsx.net/releases/") {
+        content {
+            includeGroup("net.essentialsx")
+        }
+    }
+    maven("https://jitpack.io") {
+        content {
+            includeGroup("com.github.MilkBowl")
+        }
+    }
+    maven("https://maven.enginehub.org/repo/") {
+        content {
+            includeGroup("com.sk89q.worldedit")
+            includeGroup("com.sk89q.worldguard")
+            includeGroup("com.sk89q.worldguard.worldguard-libs")
+            // worldedit-core の POM が読み込む BOM
+            includeGroup("org.enginehub.lin-bus")
+        }
+    }
     mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
-    maven("https://repo.mikeprimm.com/")
-    maven("https://repo.essentialsx.net/releases/")
-    maven("https://jitpack.io")
-    maven("https://maven.enginehub.org/repo/")
 }
 
 kotlin {
