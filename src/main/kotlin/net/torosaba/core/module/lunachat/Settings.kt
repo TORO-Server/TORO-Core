@@ -47,6 +47,9 @@ class Settings(config: ConfigurationSection, warn: (String) -> Unit = {}) {
     val opListenAllChannel = config.getBoolean("opListenAllChannel", false)
     val minChannelNameLength = config.getInt("minChannelNameLength", 4)
     val maxChannelNameLength = config.getInt("maxChannelNameLength", 20)
+
+    /** 1 人のプレイヤーが作れるチャンネルの数。0 以下なら制限しない (LunaChat には無い設定) */
+    val maxChannelsPerPlayer = config.getInt("maxChannelsPerPlayer", 5)
     val enableQuickChannelChat = config.getBoolean("enableQuickChannelChat", true)
     val quickChannelChatSeparator: String = config.getString("quickChannelChatSeparator", ":")!!
 

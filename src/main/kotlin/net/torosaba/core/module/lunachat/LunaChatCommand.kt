@@ -123,8 +123,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
                 return
             }
             if (settings.createChannelOnJoinCommand) {
-                if (!checkChannelName(sender, channelName)) return
-                val created = manager.createChannel(channelName)
+                if (!checkChannelName(sender, channelName) || !checkChannelLimit(sender)) return
+                val created = manager.createChannel(channelName, sender)
                 created.addMember(sender)
                 sender.info("cmdmsgCreate", "channel" to channelName)
             } else {
@@ -150,13 +150,13 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
 
         if (sender in channel.members) {
             if (message.isNotEmpty() && canSpeak(sender, name)) {
-                channel.chat(sender, message)
+                channel.playerChat(sender, message)
                 return
             }
             setDefault(sender, channel)
         } else {
             if (name == settings.globalChannel && message.isNotEmpty() && canSpeak(sender, name)) {
-                channel.chat(sender, message)
+                channel.playerChat(sender, message)
                 return
             }
             if (channel.password.isNotEmpty()) {
@@ -197,8 +197,17 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
         return !sender.isPermissionSet(node) || sender.hasPermission(node)
     }
 
+    /** [sender] がチャンネルをもう 1 つ作れるか。作れないならエラーを出す */
+    private fun checkChannelLimit(sender: ChannelMember): Boolean {
+        val max = settings.maxChannelsPerPlayer
+        if (max <= 0 || sender.hasPermission("lunachat-admin.mod-all-channels")) return true
+        if (manager.countCreatedBy(sender) < max) return true
+        sender.error("errmsgTooManyChannels", "max" to max)
+        return false
+    }
+
     private fun checkChannelName(sender: ChannelMember, name: String): Boolean {
-        if (!name.matches(Regex("[0-9a-zA-Z\\-_]+"))) {
+        if (!ChatRouting.isChannelNameChars(name)) {
             sender.error("errmsgCannotUseForChannel", "channel" to name)
             return false
         }
@@ -252,7 +261,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgBanned")
             return
         }
-        channel.info(channel.hasModeratorPermission(sender)).forEach { sender.send(it) }
+        channel.info(sender, channel.hasModeratorPermission(sender)).forEach { sender.send(it) }
     }
 
     private fun log(sender: ChannelMember, label: String, args: Array<String>) {
@@ -282,10 +291,11 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             return
         }
 
-        val logs: List<String>
+        val title: String
+        val read: () -> List<String>
         if (settings.globalChannel.isEmpty() && (cname == null || cname == settings.globalMarker)) {
-            logs = lc.normalChatLogger.read(player, filter, date, reverse).takeLast(100)
-            cname = "GlobalChat"
+            title = "GlobalChat"
+            read = { lc.normalChatLogger.read(player, filter, date, reverse) }
         } else {
             val channel = manager.getChannel(cname)
             if (channel == null) {
@@ -300,10 +310,30 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
                 sender.error("errmsgNomember")
                 return
             }
-            logs = channel.readLog(player, filter, date, reverse).takeLast(100)
+            title = cname ?: ""
+            read = { channel.readLog(player, filter, date, reverse) }
         }
 
-        sender.plain("logDisplayFirstLine", "channel" to (cname ?: ""))
+        // ファイルは別スレッドで読み、終わったらメインスレッドで送る。読んでいる間は同じ人の読み込みを増やさない
+        if (!lc.logReaders.add(sender)) {
+            sender.error("errmsgLogReading")
+            return
+        }
+        lc.async {
+            val logs = try {
+                read()
+            } catch (e: Exception) {
+                lc.logger.warning("チャットログを読めませんでした: $e")
+                emptyList()
+            } finally {
+                lc.logReaders.remove(sender)
+            }
+            lc.sync { sendLog(sender, title, logs) }
+        }
+    }
+
+    private fun sendLog(sender: ChannelMember, title: String, logs: List<String>) {
+        sender.plain("logDisplayFirstLine", "channel" to title)
         for (line in logs) {
             val parts = line.split(",")
             sender.plain(
@@ -335,7 +365,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             return
         }
         val invited = lc.memberByName(invitedName)
-        if (invited == null || !invited.isOnline) {
+        if (invited == null || !invited.isOnline || !sender.canSee(invited)) {
             sender.error("errmsgNotfoundPlayer", "player" to invitedName)
             return
         }
@@ -666,8 +696,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgExist")
             return
         }
-        if (!checkChannelName(sender, name)) return
-        val channel = manager.createChannel(name)
+        if (!checkChannelName(sender, name) || !checkChannelLimit(sender)) return
+        val channel = manager.createChannel(name, sender)
         channel.description = args.getOrNull(2) ?: ""
         channel.save()
         sender.info("cmdmsgCreate", "channel" to name)
@@ -796,6 +826,9 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             val other = manager.getChannel(alias)
             when {
                 alias.length > MAX_LENGTH_ALIAS -> sender.error("errmsgToolongAlias", "max" to MAX_LENGTH_ALIAS)
+                // 空は別名を消すとき。保存済みの別名は読み込みのときには調べない
+                alias.isNotEmpty() && !ChatRouting.isChannelNameChars(alias) ->
+                    sender.error("errmsgCannotUseForChannel", "channel" to alias)
                 other != null -> sender.error("errmsgDuplicatedAlias", "aliase" to alias, "channel" to other.name)
                 else -> {
                     channel.alias = alias
@@ -1012,7 +1045,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
     fun tabComplete(sender: ChannelMember, args: Array<String>): List<String> {
         val a0 = args.getOrNull(0)?.lowercase() ?: return emptyList()
         val last = args.last().lowercase()
-        fun playerNames() = lc.onlinePlayerNames().filter { it.lowercase().startsWith(last) }
+        fun playerNames() = lc.visiblePlayerNames(sender).filter { it.lowercase().startsWith(last) }
         fun joinable() = canJoinNames(sender).filter { it.lowercase().startsWith(last) }
         return when (args.size) {
             1 -> (commands + commonCommands).filter { it.name.startsWith(a0) && sender.hasPermission(it.permission) }.map { it.name }

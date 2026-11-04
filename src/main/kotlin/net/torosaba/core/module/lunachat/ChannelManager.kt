@@ -34,6 +34,9 @@ internal class ChannelManager(private val lc: LunaChatModule) {
 
     val channels: Collection<Channel> get() = channelMap.values
 
+    /** データファイルの書き込み。設定を変えるたびには書かず、まとめて別スレッドで書く */
+    val writes = WriteBatcher(lc.logWriter) { file, e -> lc.logger.warning("${file.name} を保存できませんでした: $e") }
+
     fun reloadAll() {
         folder.mkdirs()
         val warn: (Exception) -> Unit = { lc.logger.warning("データファイルを読めませんでした: $it") }
@@ -68,23 +71,21 @@ internal class ChannelManager(private val lc: LunaChatModule) {
 
     /** ファイルが無ければ空のファイルを作ってから読む (LunaChat と同じ) */
     private fun load(file: File, warn: (Exception) -> Unit): Map<String, Any?> {
-        if (!file.exists()) save(file, emptyMap())
+        if (!file.exists()) {
+            try {
+                FlatYaml.save(file, emptyMap())
+            } catch (e: Exception) {
+                lc.logger.warning("${file.name} を保存できませんでした: $e")
+            }
+        }
         return FlatYaml.load(file, warn)
     }
 
-    private fun save(file: File, data: Map<String, Any?>) {
-        try {
-            FlatYaml.save(file, data)
-        } catch (e: Exception) {
-            lc.logger.warning("${file.name} を保存できませんでした: $e")
-        }
-    }
-
-    private fun saveDefaults() = save(fileDefaults, defaultChannels.toSortedMap())
-    private fun saveTemplates() = save(fileTemplates, templates.toSortedMap())
-    private fun saveJapanize() = save(fileJapanize, japanize.toSortedMap())
-    private fun saveDictionary() = save(fileDictionary, synchronized(dictionary) { LinkedHashMap<String, Any?>(dictionary) })
-    private fun saveHidelist() = save(fileHidelist, hidelist.entries.associate { (k, v) -> k to v.map { it.id } })
+    private fun saveDefaults() = writes.mark(fileDefaults) { defaultChannels.toSortedMap() }
+    private fun saveTemplates() = writes.mark(fileTemplates) { templates.toSortedMap() }
+    private fun saveJapanize() = writes.mark(fileJapanize) { japanize.toSortedMap() }
+    private fun saveDictionary() = writes.mark(fileDictionary) { synchronized(dictionary) { LinkedHashMap<String, Any?>(dictionary) } }
+    private fun saveHidelist() = writes.mark(fileHidelist) { hidelist.entries.associate { (k, v) -> k to v.map { it.id } } }
 
     fun removeAllDefaultChannels() {
         defaultChannels.clear()
@@ -111,11 +112,18 @@ internal class ChannelManager(private val lc: LunaChatModule) {
         return channelMap.values.firstOrNull { it.alias.isNotEmpty() && it.alias.equals(name, ignoreCase = true) }
     }
 
+    /** 1:1 チャットのチャンネルを内部名 (`送信者>受信者`) で引く。別名は解決しないので、普通のチャンネルは返らない */
+    fun getPersonalChannel(name: String): Channel? = channelMap[name.lowercase()]?.takeIf { it.isPersonalChat }
+
     fun getChannelsByPlayer(member: ChannelMember): List<Channel> =
         channelMap.values.filter { member in it.members || it.isGlobalChannel }
 
-    fun createChannel(name: String): Channel {
+    /** [creator] が作ったチャンネルの数 */
+    fun countCreatedBy(creator: ChannelMember): Int = channelMap.values.count { it.creator == creator }
+
+    fun createChannel(name: String, creator: ChannelMember? = null): Channel {
         val channel = Channel(lc, name)
+        channel.creator = creator
         channelMap[name.lowercase()] = channel
         channel.save()
         return channel

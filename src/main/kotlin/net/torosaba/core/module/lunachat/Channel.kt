@@ -40,6 +40,9 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
     /** 1:1 チャットの相手 */
     var privateMessageTo: ChannelMember? = null
 
+    /** チャンネルを作ったプレイヤー。作成数の上限に使う。上限を入れる前のチャンネルや、サーバーが作ったチャンネルは null */
+    var creator: ChannelMember? = null
+
     private val logger = ChatLogger(lc.dataFolder, if (name.contains(">")) "pm/" + name.replace(">", "-") else name.replace("*", "_"), lc.logWriter)
 
     private val settings get() = lc.settings
@@ -68,6 +71,11 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
         ChatFormat.make(format, member.vars(), vars(), messages, withPlayerLink, lc.manager::getTemplate)
 
     // ---- 発言 ----
+
+    /** プレイヤーの発言を流す。連投と禁止ワードの判定 ([LunaChatModule.allowChat]) を通ったときだけ [chat] する */
+    fun playerChat(player: ChannelMember, message: String) {
+        if (lc.allowChat(player, message)) chat(player, message)
+    }
 
     /** このチャンネルに発言する。メインスレッドで呼ぶ */
     fun chat(player: ChannelMember, message: String) {
@@ -269,6 +277,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
         if (settings.loggingChat) logger.log(message, name)
     }
 
+    /** ログを読む。ファイルを読むので、メインスレッドでは呼ばない */
     fun readLog(player: String?, filter: String?, date: String?, reverse: Boolean) =
         logger.read(player, filter, date, reverse)
 
@@ -317,8 +326,8 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
 
     // ---- 情報 ----
 
-    /** /ch info の内容 */
-    fun info(forModerator: Boolean): List<Component> {
+    /** [viewer] に見せる /ch info の内容 */
+    fun info(viewer: ChannelMember, forModerator: Boolean): List<Component> {
         val lines = mutableListOf<Component>()
         fun add(legacy: String) {
             lines += Colors.component(legacy)
@@ -337,7 +346,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
                     var n = cp.name
                     if (cp in moderator) n = "@$n"
                     val color = when {
-                        !cp.isOnline -> "§7"
+                        !cp.isOnline || !viewer.canSee(cp) -> "§7"
                         cp in hided -> "§3"
                         else -> "§f"
                     }
@@ -397,7 +406,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
 
     private fun file(): File = File(File(lc.dataFolder, FOLDER), "$name.yml")
 
-    fun serialize(): Map<String, Any?> = linkedMapOf(
+    fun serialize(): Map<String, Any?> = linkedMapOf<String, Any?>(
         "name" to name,
         "alias" to alias,
         "desc" to description,
@@ -417,21 +426,15 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
         "mute_expires" to muteExpires.entries.associate { it.key.id to it.value },
         "allowcc" to allowCC,
         "japanize" to japanizeType?.toString(),
-    )
+    ).apply { creator?.let { put("creator", it.id) } }
 
-    /** channels/<name>.yml に保存する。1:1 チャットは保存しない */
-    fun save(): Boolean {
-        if (isPersonalChat) return false
-        return try {
-            FlatYaml.save(file(), serialize())
-            true
-        } catch (e: Exception) {
-            lc.logger.warning("チャンネル $name を保存できませんでした: $e")
-            false
-        }
+    /** channels/<name>.yml に保存する (書き込みは [WriteBatcher] がまとめて行う)。1:1 チャットは保存しない */
+    fun save() {
+        if (isPersonalChat) return
+        lc.manager.writes.mark(file()) { serialize() }
     }
 
-    fun deleteFile(): Boolean = file().let { it.exists() && it.delete() }
+    fun deleteFile() = lc.manager.writes.delete(file())
 
     companion object {
         const val FOLDER = "channels"
@@ -458,6 +461,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
                 muteExpires.putAll(expireMap(lc, data["mute_expires"]))
                 allowCC = data["allowcc"] as? Boolean ?: true
                 japanizeType = JapanizeType.fromId(data["japanize"]?.toString(), null)
+                creator = data["creator"]?.toString()?.let(lc::memberById)
             }
         }
 

@@ -33,6 +33,38 @@ class ChatRoutingTest {
     }
 
     @Test
+    fun quickChatOnlyTargetsJoinedChannels() {
+        val channels = mapOf("main" to true, "other" to false)
+        fun target(message: String) = ChatRouting.quickTarget(message, ":", { channels[it] }) { it }
+
+        assertEquals(true to "hello", target("main:hello"))
+        // 入っていないチャンネルや、チャンネルと関係ない書き出しは普通の発言のまま
+        assertNull(target("other:hello"))
+        assertNull(target("http://example.com"))
+        assertNull(target("hello"))
+        // 発言が空なら普通の発言のまま
+        assertNull(target("main:"))
+        assertNull(target("main: "))
+    }
+
+    @Test
+    fun channelNameCharacters() {
+        assertTrue(ChatRouting.isChannelNameChars("main_1-A"))
+        assertTrue(ChatRouting.isChannelNameChars("m"))
+        assertFalse(ChatRouting.isChannelNameChars(""))
+        assertFalse(ChatRouting.isChannelNameChars("Steve>Alex"))
+        assertFalse(ChatRouting.isChannelNameChars("メイン"))
+        assertFalse(ChatRouting.isChannelNameChars("a b"))
+    }
+
+    @Test
+    fun maxChannelsPerPlayerHasADefaultWhenTheKeyIsMissing() {
+        assertEquals(5, Settings(YamlConfiguration()).maxChannelsPerPlayer)
+        val yaml = YamlConfiguration().apply { set("maxChannelsPerPlayer", 2) }
+        assertEquals(2, Settings(yaml).maxChannelsPerPlayer)
+    }
+
+    @Test
     fun torosProductionSettings() {
         val yaml = YamlConfiguration.loadConfiguration(
             """

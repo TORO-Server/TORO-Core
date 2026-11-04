@@ -5,6 +5,8 @@ import java.nio.file.Files
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -77,5 +79,106 @@ class StorageTest {
         assertEquals(1, logger.read(null, "bye", null, false).size)
         assertTrue(logger.read(null, null, null, true)[0].endsWith(",bye,Alex"))
         assertTrue(logger.read(null, null, "0101", false).isEmpty() || today.endsWith("01-01"))
+    }
+
+    @Test
+    fun chatLogReadIsLimited() {
+        val direct = Executor { it.run() }
+        val logger = ChatLogger(tempDir(), "main", direct)
+        repeat(150) { logger.log("line$it", if (it % 2 == 0) "Steve" else "Alex") }
+
+        // 既定では新しい方から 100 行を、古い順に返す
+        val lines = logger.read(null, null, null, false)
+        assertEquals(ChatLogger.MAX_READ_LINES, lines.size)
+        assertTrue(lines.first().contains(",line50,"))
+        assertTrue(lines.last().contains(",line149,"))
+
+        // 逆順は、これまでと同じく古い方から 100 行を新しい順に返す
+        val reversed = logger.read(null, null, null, true)
+        assertEquals(ChatLogger.MAX_READ_LINES, reversed.size)
+        assertTrue(reversed.first().contains(",line99,"))
+        assertTrue(reversed.last().contains(",line0,"))
+
+        // 絞り込みの後の行数で数える
+        val steve = logger.read("Steve", null, null, false, limit = 3)
+        assertEquals(listOf(",line144,", ",line146,", ",line148,"), steve.map { line -> ",${line.split(",")[1]}," })
+    }
+
+    @Test
+    fun batcherWritesEachFileOnceWithTheLatestContent() {
+        val dir = tempDir()
+        val file = File(dir, "channels/main.yml")
+        val tasks = ArrayList<Runnable>()
+        val batcher = WriteBatcher({ tasks += it })
+        var built = 0
+
+        var name = "first"
+        repeat(3) {
+            batcher.mark(file) {
+                built++
+                mapOf("name" to name)
+            }
+        }
+        assertEquals(0, built)
+        assertTrue(!file.exists())
+
+        name = "last"
+        batcher.flush()
+        assertEquals(1, built)
+        assertEquals(1, tasks.size)
+        tasks.forEach { it.run() }
+        assertEquals("last", FlatYaml.load(file)["name"])
+
+        // 何も変わっていなければ書かない
+        tasks.clear()
+        batcher.flush()
+        assertTrue(tasks.isEmpty())
+    }
+
+    @Test
+    fun batcherDeleteDropsPendingWriteAndKeepsOrder() {
+        val dir = tempDir()
+        val file = File(dir, "channels/main.yml")
+        val direct = Executor { it.run() }
+        val batcher = WriteBatcher(direct)
+
+        batcher.mark(file) { mapOf("name" to "main") }
+        batcher.flush()
+        assertTrue(file.isFile)
+
+        batcher.mark(file) { mapOf("name" to "changed") }
+        batcher.delete(file)
+        batcher.flush()
+        assertTrue(!file.exists())
+
+        // 消した後に同じ名前で作り直しても書ける
+        batcher.mark(file) { mapOf("name" to "again") }
+        batcher.flush()
+        assertEquals("again", FlatYaml.load(file)["name"])
+    }
+
+    @Test
+    fun flushBeforeShutdownKeepsAllPendingWrites() {
+        // 停止のときと同じ順番 (flush → shutdown → awaitTermination) で、書き込みが失われない
+        val dir = tempDir()
+        val writer = Executors.newSingleThreadExecutor()
+        val batcher = WriteBatcher(writer)
+        val files = (1..20).map { File(dir, "channels/c$it.yml") }
+        files.forEachIndexed { i, file -> batcher.mark(file) { mapOf("name" to "c${i + 1}") } }
+
+        batcher.flush()
+        writer.shutdown()
+        assertTrue(writer.awaitTermination(30, TimeUnit.SECONDS))
+
+        files.forEachIndexed { i, file -> assertEquals("c${i + 1}", FlatYaml.load(file)["name"]) }
+        assertTrue(File(dir, "channels").listFiles()!!.none { it.name.endsWith(".tmp") })
+    }
+
+    @Test
+    fun saveReplacesExistingFile() {
+        val file = File(tempDir(), "defaults.yml")
+        FlatYaml.save(file, mapOf("a" to "1"))
+        FlatYaml.save(file, mapOf("b" to "2"))
+        assertEquals(mapOf<String, Any?>("b" to "2"), FlatYaml.load(file))
     }
 }

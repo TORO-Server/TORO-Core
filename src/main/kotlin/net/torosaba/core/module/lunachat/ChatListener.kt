@@ -27,6 +27,25 @@ object ChatRouting {
         if (index < 0) return null
         return message.substring(0, index) to message.substring(index + separator.length)
     }
+
+    /**
+     * クイックチャンネルチャットの宛先と発言。
+     * 発言者が入っていないチャンネルは宛先にしない (null を返して、普通の発言として流す)
+     *
+     * @param find チャンネル名か別名からチャンネルを引く
+     * @param isJoined 発言者がそのチャンネルに入っているか
+     */
+    fun <C> quickTarget(message: String, separator: String, find: (String) -> C?, isJoined: (C) -> Boolean): Pair<C, String>? {
+        val (name, value) = splitQuick(message, separator) ?: return null
+        if (value.isBlank()) return null
+        val channel = find(name) ?: return null
+        return if (isJoined(channel)) channel to value else null
+    }
+
+    private val channelNameChars = Regex("[0-9a-zA-Z\\-_]+")
+
+    /** チャンネル名と別名に使える文字だけでできているか */
+    fun isChannelNameChars(name: String): Boolean = channelNameChars.matches(name)
 }
 
 /**
@@ -70,24 +89,19 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
             return
         }
 
+        val member = lc.member(event.player)
+
         // クイックチャンネルチャット
         if (settings.enableQuickChannelChat) {
-            ChatRouting.splitQuick(event.message, settings.quickChannelChatSeparator)?.let { (name, value) ->
-                val channel = manager.getChannel(name)
-                if (channel != null && !channel.isPersonalChat) {
-                    val member = lc.member(event.player)
-                    event.isCancelled = true
-                    if (member !in channel.members) {
-                        member.send(lc.messages.error("errmsgNomember"))
-                    } else {
-                        lc.sync { channel.chat(member, value) }
-                    }
-                    return
-                }
+            ChatRouting.quickTarget(event.message, settings.quickChannelChatSeparator, manager::getChannel) {
+                !it.isPersonalChat && member in it.members
+            }?.let { (channel, value) ->
+                event.isCancelled = true
+                lc.sync { channel.playerChat(member, value) }
+                return
             }
         }
 
-        val member = lc.member(event.player)
         val channel = manager.getDefaultChannel(member.name)
         if (channel == null) {
             if (settings.noJoinAsGlobal) chatGlobal(event) else event.isCancelled = true
@@ -96,7 +110,7 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
 
         val message = event.message
         event.isCancelled = true
-        lc.sync { channel.chat(member, message) }
+        lc.sync { channel.playerChat(member, message) }
     }
 
     /** グローバル発言にする。グローバルチャンネルが無ければ通常のチャットのまま流す */
@@ -111,7 +125,7 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
                 val manager = lc.manager
                 val global = manager.getChannel(settings.globalChannel) ?: manager.createChannel(settings.globalChannel)
                 if (manager.getDefaultChannel(member.name) == null) manager.setDefaultChannel(member.name, global.name)
-                global.chat(member, message)
+                global.playerChat(member, message)
             }
             return
         }
@@ -162,7 +176,11 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
         }
 
         if (settings.enableNormalChatClickable) {
-            // クリックできるチャット: イベントを取り消して自分で送る
+            // クリックできるチャット: イベントを取り消して自分で送る。取り消すと raid-watcher のイベントの判定を通らないので、ここで通す
+            if (!lc.allowChat(member, message)) {
+                event.isCancelled = true
+                return
+            }
             val formatText = if (settings.enableNormalChatMessageFormat) {
                 settings.normalChatMessageFormat
             } else {

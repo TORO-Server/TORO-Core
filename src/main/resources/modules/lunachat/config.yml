@@ -59,6 +59,10 @@ opListenAllChannel: false
 minChannelNameLength: 4
 maxChannelNameLength: 20
 
+# 1 人のプレイヤーが作れるチャンネルの数。0 以下なら制限しない。
+# 権限 lunachat-admin.mod-all-channels を持つ人には効かない。この設定を入れる前に作られたチャンネルは数えない。
+maxChannelsPerPlayer: 5
+
 # クイックチャンネルチャット機能 (「m:こんにちは！」のように、チャンネル名か別名と記号を付けて発言する)
 enableQuickChannelChat: true
 
