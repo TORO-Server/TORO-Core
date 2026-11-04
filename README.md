@@ -66,6 +66,9 @@ dynmap が出しているプレイヤーの分だけをブラウザに流す。`
 - LunaChat の表示言語は `lunachat/config.yml` の `lang` で決まる (TORO-Configs の本番設定は `ja`)。移す前のサーバーの設定が `en` のままなら英語になる
 - `dynmap-worldguard` は WorldGuard の領域のフラグ `dynmap-boost` も登録する。WorldGuard より後に読み込むよう `softdepend` に入れてある
 - InventoryBackup の `restore-command` にある `/inventorybackup:restore` は、自動で `/toro-core:restore` に読み替える
+- InventoryBackup の復元の案内は、アイテムが消えたと言い切れるとき (クリアのコマンド、何も落とさずに死んだとき、クリエイティブのインベントリで空にしたとき) だけ出す
+- raid-watcher の `HighRateLoginBlocker.allowed` は、全体ではなく IP ごと・アカウントごとの回数になった。全体の上限は `allowed-global`
+- `/skill` の道具は 1 つだけ渡す。クラスを変えると回収し、捨てることや容器へ移すことはできない
 - WorldBorder の本番の境界 (`worlds:`) は TORO-Configs の公開用設定に入っていないので、サーバーの `plugins/WorldBorder/config.yml` から移ることを確認する
 
 管理コマンド (`torocore.admin`, 既定 OP):
@@ -75,10 +78,10 @@ dynmap が出しているプレイヤーの分だけをブラウザに流す。`
 
 ## ビルド
 
-JDK 25 と Gradle 9 (ラッパーは無いので `gradle` を使う)。
+JDK 25 と Gradle ラッパー (Gradle 9.3.0。`gradle-wrapper.properties` の `distributionSha256Sum` で配布物を検証する)。
 
 ```
-gradle build
+./gradlew build
 ```
 
 `build/libs/TORO-Core-<version>.jar` が配布する JAR (Kotlin の標準ライブラリを `net.torosaba.core.libs.kotlin` に移して同梱)。
