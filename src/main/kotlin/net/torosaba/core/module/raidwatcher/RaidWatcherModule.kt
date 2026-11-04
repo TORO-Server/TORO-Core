@@ -7,6 +7,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import net.torosaba.core.Module
 import org.bukkit.Bukkit
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
@@ -14,6 +15,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.permissions.PermissionDefault
+import java.net.InetAddress
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -23,16 +25,17 @@ import java.util.regex.Pattern
 /**
  * 旧 raidwatcher。荒らしの大量参加とスパムへの対策。
  * - 同じ IP の別アカウントの同時参加を断る
- * - 短い時間に参加が多すぎたら、しばらく入室を制限する
+ * - 同じ IP・同じアカウントのログインが短い時間に多すぎたら、その人だけ断る
+ * - 全体のログインが短い時間に多すぎたら、しばらく入室を制限する
  * - チャットの連投と禁止ワードを止め、Essentials でミュート・キックする
  */
 class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
     private lateinit var settings: Settings
+    private lateinit var loginLimiter: LoginRateLimiter
     private var essentials: EssentialsHook? = null
     private var luckPerms: LuckPermsHook? = null
 
     // ログインもチャットも非同期のスレッドから来る
-    private val loginRate = AtomicInteger(0)
     @Volatile private var lockdownEnd = 0L
     private val chatRate = ConcurrentHashMap<UUID, AtomicInteger>()
     private val onlinePlayerIps = ConcurrentHashMap<UUID, String>()
@@ -41,6 +44,13 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
 
     override fun onEnable() {
         settings = Settings.load(config)
+        val limits = settings.login.limits
+        loginLimiter = LoginRateLimiter(limits)
+        lockdownEnd = 0L
+        logger.info(
+            "ログインの上限 (${limits.windowMillis / 1000.0} 秒ごと): " +
+                "IP ごと ${limits.perIp} 回、アカウントごと ${limits.perAccount} 回、全体 ${limits.global} 回",
+        )
 
         permission(BYPASS, PermissionDefault.OP, "プレイヤーを監視対象から除外・ログイン規制中でも参加可能")
 
@@ -50,8 +60,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
         luckPerms = if (pm.isPluginEnabled("LuckPerms")) LuckPermsHook() else null
 
         listen(WatchListener())
-        runTimer(0, settings.login.per.toLong()) { loginRate.set(0) }
-        runTimer(0, settings.spam.per.toLong()) { chatRate.values.forEach { it.set(0) } }
+        runTimer(0, settings.spam.per.toLong().coerceAtLeast(1)) { chatRate.values.forEach { it.set(0) } }
     }
 
     override fun onDisable() {
@@ -69,6 +78,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
         @EventHandler
         fun onPlayerQuit(event: PlayerQuitEvent) {
             onlinePlayerIps.remove(event.player.uniqueId)
+            chatRate.remove(event.player.uniqueId)
         }
 
         // PlayerLoginEvent は廃止予定なので、ログイン前のイベントで判定する。
@@ -91,57 +101,75 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
             // 高速複数アカウントログインへの対抗
             val login = settings.login
             if (login.enable) {
-                if (lockdownEnd > System.currentTimeMillis()) {
-                    event.disallow(
-                        AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
-                        Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。"),
-                    )
+                val now = System.currentTimeMillis()
+                if (lockdownEnd > now) {
+                    event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, BUSY_MESSAGE)
                     return
                 }
-                if (loginRate.incrementAndGet() > login.allowed) {
-                    parseDateDiff(login.cooldown)?.let { lockdownEnd = it }
-                    event.disallow(
-                        AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
-                        Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。"),
-                    )
-                    return
+                when (loginLimiter.tryAcquire(clientIp(event.address), event.uniqueId, now)) {
+                    LoginRateLimiter.Result.ALLOWED -> {}
+                    LoginRateLimiter.Result.IP_LIMITED, LoginRateLimiter.Result.ACCOUNT_LIMITED ->
+                        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, TOO_MANY_LOGINS_MESSAGE)
+                    LoginRateLimiter.Result.GLOBAL_LIMITED -> {
+                        parseDateDiff(login.cooldown)?.let { lockdownEnd = it }
+                        logger.warning("短い時間のログインが全体の上限を超えたので、${login.cooldown} の間 入室を制限します")
+                        event.disallow(AsyncPlayerPreLoginEvent.Result.KICK_OTHER, BUSY_MESSAGE)
+                    }
                 }
             }
         }
 
         @EventHandler
         fun onAsyncChat(event: AsyncChatEvent) {
-            val player = event.player
-            if (player.hasPermission(BYPASS)) return
-            val uuid = player.uniqueId
+            // lunachat モジュールが取り消した発言は、Channel.chat の前に判定済みなので数えない
+            if (event.isCancelled && plugin.modules.any { it.id == "lunachat" && it.enabled }) return
+            val text = PlainTextComponentSerializer.plainText().serialize(event.message())
+            if (!checkChat(event.player, text)) event.isCancelled = true
+        }
+    }
 
-            val spam = settings.spam
-            if (spam.enable) {
-                val count = chatRate.computeIfAbsent(uuid) { AtomicInteger() }.incrementAndGet()
-                if (count > spam.allowed) {
-                    event.isCancelled = true
-                    runSync {
-                        mute(uuid, "spam", spam.penaltyMute)
-                        if (spam.penaltyKick) Bukkit.getPlayer(uuid)?.kick(Component.text("スパム行為が検知されました。", red))
-                    }
-                }
-            }
+    /**
+     * 発言を通してよいかを調べる。連投と禁止ワードなら罰を与えて false を返す。
+     * チャットのイベントと、イベントを通らない発言 (lunachat のチャンネル発言と /tell) の両方で使う。どのスレッドからでも呼べる
+     */
+    internal fun checkChat(player: Player, text: String): Boolean {
+        if (player.hasPermission(BYPASS)) return true
+        val uuid = player.uniqueId
+        var allowed = true
 
-            val filter = settings.filter
-            if (filter.enable) {
-                val text = PlainTextComponentSerializer.plainText().serialize(event.message())
-                if (filter.pattern.any { it.matcher(text).find() }) {
-                    event.isCancelled = true
-                    runSync {
-                        mute(uuid, "blocked word", filter.penaltyMute)
-                        if (filter.penaltyKick) {
-                            Bukkit.getPlayer(uuid)?.kick(Component.text("あなたのチャットには禁止ワードが含まれていました。", red))
-                        }
-                    }
+        val spam = settings.spam
+        if (spam.enable) {
+            val count = chatRate.computeIfAbsent(uuid) { AtomicInteger() }.incrementAndGet()
+            if (count > spam.allowed) {
+                allowed = false
+                runSync {
+                    mute(uuid, "spam", spam.penaltyMute)
+                    if (spam.penaltyKick) Bukkit.getPlayer(uuid)?.kick(Component.text("スパム行為が検知されました。", red))
                 }
             }
         }
+
+        val filter = settings.filter
+        if (filter.enable && filter.pattern.any { it.matcher(text).find() }) {
+            allowed = false
+            runSync {
+                mute(uuid, "blocked word", filter.penaltyMute)
+                if (filter.penaltyKick) {
+                    Bukkit.getPlayer(uuid)?.kick(Component.text("あなたのチャットには禁止ワードが含まれていました。", red))
+                }
+            }
+        }
+        return allowed
     }
+
+    /** Essentials でミュートされているか。イベントを通らない発言 (/tell など) で確かめるのに使う */
+    internal fun isMuted(player: Player): Boolean =
+        !player.hasPermission(BYPASS) && runCatching { essentials?.isMuted(player.uniqueId) }.getOrNull() == true
+
+    /** IP で人を区別できるアドレスなら文字列にする。プロキシの内側のアドレスは全員同じに見えることがあるので使わない */
+    private fun clientIp(address: InetAddress): String? =
+        address.takeUnless { it.isLoopbackAddress || it.isSiteLocalAddress || it.isLinkLocalAddress || it.isAnyLocalAddress }
+            ?.hostAddress
 
     /** まだ Player が無いので、LuckPerms か OP で raidwatcher.bypass を調べる */
     private fun hasBypass(uuid: UUID): Boolean {
@@ -180,11 +208,19 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
         val oneIpMultiAccount: Boolean,
     ) {
         companion object {
+            // allowed-per-ip などは後から足した設定で、本番の設定ファイルには無いことがある
+            private fun YamlConfiguration.intOrNull(path: String): Int? = if (isInt(path)) getInt(path) else null
+
             fun load(file: YamlConfiguration) = Settings(
                 HighRateLoginBlocker(
                     file.getBoolean("HighRateLoginBlocker.enable"),
-                    file.getInt("HighRateLoginBlocker.allowed"),
-                    file.getInt("HighRateLoginBlocker.per"),
+                    LoginLimits.of(
+                        allowed = file.getInt("HighRateLoginBlocker.allowed"),
+                        perTicks = file.getInt("HighRateLoginBlocker.per"),
+                        perIp = file.intOrNull("HighRateLoginBlocker.allowed-per-ip"),
+                        perAccount = file.intOrNull("HighRateLoginBlocker.allowed-per-account"),
+                        global = file.intOrNull("HighRateLoginBlocker.allowed-global"),
+                    ),
                     file.getString("HighRateLoginBlocker.cooldown"),
                 ),
                 SpamDetector(
@@ -205,11 +241,13 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
         }
     }
 
-    private data class HighRateLoginBlocker(val enable: Boolean, val allowed: Int, val per: Int, val cooldown: String?)
+    private data class HighRateLoginBlocker(val enable: Boolean, val limits: LoginLimits, val cooldown: String?)
     private data class SpamDetector(val enable: Boolean, val allowed: Int, val per: Int, val penaltyMute: String?, val penaltyKick: Boolean)
     private data class ChatFilter(val enable: Boolean, val pattern: List<Pattern>, val penaltyMute: String?, val penaltyKick: Boolean)
 
     private companion object {
         const val BYPASS = "raidwatcher.bypass"
+        val BUSY_MESSAGE = Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。")
+        val TOO_MANY_LOGINS_MESSAGE = Component.text("短い時間に何度も接続しています。時間を置いて再度お試しください。")
     }
 }

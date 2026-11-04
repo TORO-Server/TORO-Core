@@ -21,6 +21,8 @@ internal class EssentialsHook {
         user.setMuteReason(reason)
         user.setMuteTimeout(parseDateDiff(time))
     }
+
+    fun isMuted(uuid: UUID): Boolean = ess.getUser(uuid)?.isMuted == true
 }
 
 internal class LuckPermsHook {
