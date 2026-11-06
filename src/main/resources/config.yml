@@ -36,3 +36,5 @@ modules:
   dynmap-worldguard: true
   # 新しく作った機能
   dynmap-live: true
+  # ブロック変更の記録 (既定は無効。描画には使わず、記録だけする)
+  map-dirty: false

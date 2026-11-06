@@ -18,7 +18,7 @@ class TOROCore : JavaPlugin() {
     override fun onLoad() {
         for (module in modules) {
             // 止めたモジュールは読み込まない (元のプラグインと同じ WorldGuard のフラグを登録してぶつかるなど)
-            if (!config.getBoolean("modules.${module.id}", true)) continue
+            if (!moduleOn(module)) continue
             try {
                 module.onServerLoad(this)
             } catch (e: Throwable) {
@@ -37,11 +37,21 @@ class TOROCore : JavaPlugin() {
         disableModules()
     }
 
+    /**
+     * モジュールが有効かどうか。設定ファイルに書かれていないときは、JAR 内 config.yml の
+     * 既定値に従う (無いときは有効)。getBoolean に既定値を渡すと JAR の既定値を見ないので分けてある
+     */
+    private fun moduleOn(module: Module): Boolean {
+        val path = "modules.${module.id}"
+        return if (config.isSet(path)) config.getBoolean(path, true)
+        else config.defaults?.getBoolean(path, true) ?: true
+    }
+
     private fun isModuleOn(module: Module): Boolean {
         val path = "modules.${module.id}"
         if (!config.isSet(path)) {
-            // 新しく追加したモジュールは、既定で有効にして設定ファイルにも書き足す
-            config.set(path, true)
+            // 新しく追加したモジュールは、既定の値を設定ファイルにも書き足す
+            config.set(path, moduleOn(module))
             saveConfig()
         }
         return config.getBoolean(path, true)
