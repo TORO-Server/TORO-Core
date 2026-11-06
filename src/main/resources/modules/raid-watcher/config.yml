@@ -1,8 +1,18 @@
 HighRateLoginBlocker:
   enable: true
-  allowed: 3
+  # per tick の間に入れるログインの回数。同じ IP と同じアカウントのそれぞれに使う (超えたらその人だけ断る)
+  # TORO-Proxy が limbo から戻すプレイヤーが断られないよう、これより少なく書いても下限 (per: 200 なら 5 回) までは入れる
+  allowed: 5
   per: 200
+  # 全体の上限を超えたときに、全員 (raidwatcher.bypass を持つ人以外) の入室を止める時間
   cooldown: 10s
+  # 全体の上限。TORO-Proxy が戻す速さ (3 秒に 5 人) でも超えないよう、これより少なく書いても下限 (per: 200 なら 25 回) までは入れる
+  # 書いていないときは 60 回
+  allowed-global: 60
+  # IP ごと・アカウントごとの上限を allowed と別にするときに書く
+  # OneIPMultiAccountBlocker を切って、同じ IP から何人も入るサーバーでは allowed-per-ip を増やす
+  # allowed-per-ip: 5
+  # allowed-per-account: 5
 
 SpamDetector:
   enable: true

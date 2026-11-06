@@ -28,12 +28,16 @@ internal class PrivateMessageCommands(private val lc: LunaChatModule) {
             sender.send(messages.error("errmsgNotfoundPM"))
             return
         }
-        sendTellMessage(sender, invitedName, args.joinToString(" ").trim())
+        sendTellMessage(sender, invitedName, args.joinToString(" ").trim(), isReply = true)
     }
 
-    private fun sendTellMessage(inviter: ChannelMember, invitedName: String, message: String) {
+    /**
+     * @param isReply /reply か。vanish 中の人から届いた 1:1 チャットにも返信できるよう、続きの会話では見えなくても宛先にできる
+     */
+    private fun sendTellMessage(inviter: ChannelMember, invitedName: String, message: String, isReply: Boolean = false) {
         val invited = lc.memberByName(invitedName)
-        if (invited == null || !invited.isOnline) {
+        // 見えない相手は、サーバーにいないものとして扱う
+        if (invited == null || !invited.isOnline || (!isReply && !inviter.canSee(invited))) {
             inviter.send(messages.error("errmsgNotfoundPlayer", "player" to invitedName))
             return
         }
@@ -41,10 +45,12 @@ internal class PrivateMessageCommands(private val lc: LunaChatModule) {
             inviter.send(messages.error("errmsgCannotSendPMSelf"))
             return
         }
+        if (message.isNotBlank() && !lc.allowChat(inviter, message)) return
 
         val manager = lc.manager
         val cname = inviter.name + ">" + invited.name
-        val channel = manager.getChannel(cname) ?: manager.createChannel(cname).apply {
+        // 1:1 チャットは内部名だけで引く (別名は解決しない)
+        val channel = manager.getPersonalChannel(cname) ?: manager.createChannel(cname).apply {
             visible = false
             addMember(inviter)
             addMember(invited)
@@ -57,8 +63,8 @@ internal class PrivateMessageCommands(private val lc: LunaChatModule) {
         lc.privateMessageMap[inviter.name] = invited.name
     }
 
-    fun tellTab(args: Array<String>): List<String> =
-        if (args.size == 1) lc.onlinePlayerNames().toList() else emptyList()
+    fun tellTab(sender: ChannelMember, args: Array<String>): List<String> =
+        if (args.size == 1) lc.visiblePlayerNames(sender).toList() else emptyList()
 
     fun japanize(sender: ChannelMember, label: String, args: Array<String>) {
         val manager = lc.manager
@@ -87,7 +93,7 @@ internal class PrivateMessageCommands(private val lc: LunaChatModule) {
     }
 
     fun japanizeTab(sender: ChannelMember, args: Array<String>): List<String> = when (args.size) {
-        1 -> listOf("on", "off") + if (sender.hasPermission(PERM_JAPANIZE_OTHER)) lc.onlinePlayerNames() else emptyList()
+        1 -> listOf("on", "off") + if (sender.hasPermission(PERM_JAPANIZE_OTHER)) lc.visiblePlayerNames(sender) else emptyList()
         2 -> if (sender.hasPermission(PERM_JAPANIZE_OTHER)) listOf("on", "off") else emptyList()
         else -> emptyList()
     }

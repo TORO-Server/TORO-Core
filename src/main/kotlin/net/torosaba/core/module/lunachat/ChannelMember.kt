@@ -50,6 +50,13 @@ internal sealed class ChannelMember {
     /** このメンバーとして発言する */
     open fun chat(message: String) {}
 
+    /** [other] がこのメンバーに見えているか。vanish 中のプレイヤーは見えない。コンソールなどはすべて見える */
+    fun canSee(other: ChannelMember): Boolean {
+        val self = player ?: return true
+        val target = other.player ?: return true
+        return self.canSee(target)
+    }
+
     fun vars(): MemberVars = MemberVars(name, displayName, { prefix }, { suffix }, worldName, "")
 
     override fun equals(other: Any?): Boolean = other is ChannelMember && other.id == id

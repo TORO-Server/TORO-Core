@@ -44,7 +44,7 @@ internal class LuckPermsGroups(private val module: AddPermModule) {
                 val senderName = (sender as? Player)?.name ?: "Console"
                 val action = if (add) "付与" else "剥奪"
                 val role = if (group == "builder") "WE" else "Driver"
-                module.sendWebhook("$senderName が $targetName に ${role}を${action}しました")
+                module.sendWebhook(AddPermModule.changeLog(senderName, targetName, role, action))
                 reply(sender, "$targetName に ${role}を${action}しました。")
             }
         }.exceptionally { e ->

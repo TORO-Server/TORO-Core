@@ -11,6 +11,7 @@ import net.torosaba.core.Module
 import net.torosaba.core.module.lunachat.bridge.Bridges
 import net.torosaba.core.module.lunachat.bridge.DynmapLink
 import net.torosaba.core.module.lunachat.bridge.PrefixSource
+import net.torosaba.core.module.raidwatcher.RaidWatcherModule
 import org.bukkit.Bukkit
 import org.bukkit.World
 import org.bukkit.command.CommandSender
@@ -61,6 +62,9 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
     /** /tell /reply の会話相手 */
     internal val privateMessageMap = ConcurrentHashMap<String, String>()
 
+    /** いま /ch log を読んでいる人 (同じ人の読み込みを重ねない) */
+    internal val logReaders: MutableSet<ChannelMember> = ConcurrentHashMap.newKeySet()
+
     private val uuidCacheFile get() = File(dataFolder, "uuidcache.yml")
 
     override fun onEnable() {
@@ -85,13 +89,20 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
 
         // 期限付きの BAN と Mute を 30 秒ごとに確かめる
         runTimer(100, 600) { manager.channels.toList().forEach { it.checkExpires() } }
+        // チャンネルと設定の変更を 5 秒ごとにファイルへ書く
+        runTimer(WRITE_INTERVAL_TICKS, WRITE_INTERVAL_TICKS) { manager.writes.flush() }
     }
 
     override fun onDisable() {
         if (!::logWriter.isInitialized) return
         saveUuidCache()
+        // まとめている書き込みを残さないよう、全部書き終わるまで待つ
+        if (::manager.isInitialized) manager.writes.flush()
         logWriter.shutdown()
-        logWriter.awaitTermination(5, TimeUnit.SECONDS)
+        if (!logWriter.awaitTermination(WRITE_WAIT_SECONDS, TimeUnit.SECONDS)) {
+            logger.warning("データファイルの書き込みが $WRITE_WAIT_SECONDS 秒で終わりませんでした")
+        }
+        logReaders.clear()
         dynmap = null
         prefixSource = null
     }
@@ -110,6 +121,13 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
 
     /** /ch reload */
     internal fun reloadAll() {
+        // 読み直す前に、まだ書いていない変更をファイルに書く
+        manager.writes.flush()
+        try {
+            logWriter.submit {}.get(WRITE_WAIT_SECONDS, TimeUnit.SECONDS)
+        } catch (e: Exception) {
+            logger.warning("データファイルの書き込みを待てませんでした: $e")
+        }
         reloadConfig()
         loadSettings()
         manager.reloadAll()
@@ -133,7 +151,7 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
         command(
             "tell", listOf("msg", "message", "m", "t"), permission = "lunachat.message",
             description = "1:1 チャット", usage = "", override = true,
-            tab = { _, _, args -> pm.tellTab(args) },
+            tab = { sender, _, args -> pm.tellTab(member(sender), args) },
         ) { sender, label, args ->
             pm.tell(member(sender), label, args)
             true
@@ -222,6 +240,30 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
     /** Japanize で変換しないプレイヤー名 (名前順) */
     internal fun onlinePlayerNames(): Set<String> = Bukkit.getOnlinePlayers().mapTo(TreeSet()) { it.name }
 
+    /** [viewer] に見えているプレイヤーの名前 (補完に使う)。vanish 中の人は出さない */
+    internal fun visiblePlayerNames(viewer: ChannelMember): Set<String> {
+        val self = viewer.player ?: return onlinePlayerNames()
+        return Bukkit.getOnlinePlayers().filter { self.canSee(it) }.mapTo(TreeSet()) { it.name }
+    }
+
+    // ---- raid-watcher との連携 ----
+
+    /**
+     * チャットのイベントを通らない発言 (チャンネル発言と /tell) を流してよいか。
+     * raid-watcher モジュールの連投と禁止ワードの判定を、チャットのイベントと同じように通す。
+     * raid-watcher モジュールが止まっているときは判定しない。どのスレッドからでも呼べる
+     */
+    internal fun allowChat(member: ChannelMember, message: String): Boolean {
+        val player = member.player ?: return true
+        val watcher = plugin.modules.firstNotNullOfOrNull { module -> (module as? RaidWatcherModule)?.takeIf { it.enabled } }
+            ?: return true
+        if (watcher.isMuted(player)) {
+            member.send(messages.error("errmsgMutedByServer"))
+            return false
+        }
+        return watcher.checkChat(player, Colors.strip(message))
+    }
+
     // ---- uuidcache.yml ----
 
     private fun loadUuidCache() {
@@ -251,14 +293,15 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
     internal fun sync(block: () -> Unit) {
         if (Bukkit.isPrimaryThread()) {
             block()
-        } else {
+        } else if (enabled) {
+            // 別スレッドの処理が終わる前に止まっていたら、何もしない
             Bukkit.getScheduler().runTask(plugin, Runnable { if (enabled) block() })
         }
     }
 
     /** [ticks] 後にメインスレッドで実行する (どのスレッドからでも呼べる) */
     internal fun later(ticks: Long, block: () -> Unit) {
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable { if (enabled) block() }, ticks)
+        if (enabled) Bukkit.getScheduler().runTaskLater(plugin, Runnable { if (enabled) block() }, ticks)
     }
 
     /** 別スレッドで実行する (どのスレッドからでも呼べる) */
@@ -340,5 +383,7 @@ class LunaChatModule : Module("lunachat", "LunaChat") {
     private companion object {
         const val LIST_PAGE_SIZE = 8
         const val MOTD_MAX_ITEMS = 8
+        const val WRITE_INTERVAL_TICKS = 100L
+        const val WRITE_WAIT_SECONDS = 30L
     }
 }

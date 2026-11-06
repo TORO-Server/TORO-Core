@@ -1,5 +1,7 @@
 package net.torosaba.core.module.addperm
 
+import com.google.gson.JsonObject
+import net.torosaba.core.Discord
 import net.torosaba.core.Module
 import org.bukkit.Bukkit
 import org.bukkit.permissions.PermissionDefault
@@ -74,11 +76,12 @@ class AddPermModule : Module("add-perm", "AddPerm") {
         }
         try {
             val connection = URI.create(url).toURL().openConnection() as HttpURLConnection
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 30_000
             connection.requestMethod = "POST"
             connection.setRequestProperty("Content-Type", "application/json")
             connection.doOutput = true
-            val json = """{"username":"Addbuilder","content":"${content.jsonEscape()}"}"""
-            connection.outputStream.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+            connection.outputStream.use { it.write(webhookPayload(content).toString().toByteArray(Charsets.UTF_8)) }
             val code = connection.responseCode
             if (code != 204) logger.warning("Webhook送信失敗: HTTP $code")
         } catch (e: Exception) {
@@ -86,16 +89,16 @@ class AddPermModule : Module("add-perm", "AddPerm") {
         }
     }
 
-    private fun String.jsonEscape(): String = buildString {
-        for (c in this@jsonEscape) {
-            when (c) {
-                '"' -> append("\\\"")
-                '\\' -> append("\\\\")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
-            }
+    internal companion object {
+        /** Webhook に送る JSON。メンションは通知しない */
+        fun webhookPayload(content: String): JsonObject = JsonObject().apply {
+            addProperty("username", "Addbuilder")
+            addProperty("content", Discord.truncate(content, Discord.MAX_CONTENT))
+            add("allowed_mentions", Discord.noMentions())
         }
+
+        /** 権限を変えたことの記録。名前は Markdown を無害化する */
+        fun changeLog(sender: String, target: String, role: String, action: String): String =
+            "${Discord.escape(sender)} が ${Discord.escape(target)} に ${role}を${action}しました"
     }
 }

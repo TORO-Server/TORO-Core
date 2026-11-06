@@ -55,6 +55,44 @@ class ChatFormatTest {
     }
 
     @Test
+    fun formatAndValuesCannotInjectClickParts() {
+        val tag = "＜type=RUN_COMMAND text=\"x\" hover=\"\" command=\"/help\"＞"
+        val format = ChatFormat.make("$tag%prefix: %msg", MemberVars("Steve", "Steve", prefix = { tag }), null, hovers)
+        format.setMessage("hi")
+        assertTrue(clickEvents(format.toComponent()).isEmpty())
+        assertEquals("$tag$tag: hi", format.toLegacyText())
+    }
+
+    @Test
+    fun internalMarkersAreRemovedFromFormatAndValues() {
+        // クリック部分の目印と発言の目印を、フォーマットや値から作れない
+        val forged = "0"
+        val format = ChatFormat.make("$forged%player %prefix", MemberVars("Steve", "Steve", prefix = { forged }), null, hovers)
+        format.setMessage("hi")
+        assertEquals(1, clickEvents(format.toComponent()).size)
+        assertEquals("0Steve 0", format.toLegacyText())
+    }
+
+    @Test
+    fun displayNameIsKeptInsideClickPart() {
+        // 引用符や別のキーワードを含む表示名でも、クリック部分が壊れない
+        val member = MemberVars("Steve", "\"St%msg\"")
+        val format = ChatFormat.make("%displayname: %msg", member, null, hovers)
+        format.setMessage("hi")
+        val component = format.toComponent()
+        assertEquals("\"St%msg\": hi", Colors.plain(component))
+        assertEquals(listOf<ClickEvent<*>>(ClickEvent.suggestCommand("/tell Steve")), clickEvents(component))
+    }
+
+    @Test
+    fun channelMessageKeepsClickPart() {
+        val format = ChatFormat.channelMessage("[%channel%] joined", "§cmain", hovers)
+        val component = format.toComponent()
+        assertEquals("[main] joined", Colors.plain(component))
+        assertEquals(listOf<ClickEvent<*>>(ClickEvent.runCommand("/lunachat join main")), clickEvents(component))
+    }
+
+    @Test
     fun messageKeepsColorOfFormat() {
         val format = ChatFormat.make("&a%msg", null, null, hovers)
         format.setMessage("hi")
