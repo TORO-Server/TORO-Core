@@ -1,0 +1,10 @@
+# map-dirty: ブロックの変更をチャンク単位で記録する (記録のみ。地図の描画にはまだ使わない)
+# 有効にするには、TORO-Core の config.yml で modules.map-dirty を true にする (既定は無効)。
+# 記録はこのフォルダの map-dirty.jsonl に 1 窓 1 行で書かれる。
+
+# 窓の長さ (秒)。この間の変更をまとめて 1 件の記録にする
+window-seconds: 10
+# 記録ファイル 1 つの上限 (MB)。超えたら世代をずらして古いものを消す
+max-file-size-mb: 16
+# 残す世代数 (今書いているファイルを含む)
+generations: 7
