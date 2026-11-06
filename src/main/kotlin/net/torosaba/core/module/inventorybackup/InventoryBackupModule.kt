@@ -110,6 +110,12 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
     private fun onInventoryAction(player: HumanEntity, view: InventoryView) {
         clearWatch.remove(player.uniqueId)
         if (!view.isOwnInventory()) creative.onMovedOut(player.uniqueId)
+        // 他人のインベントリを開いて編集した場合 (/invsee など) は、操作した本人だけでなく持ち主の分も記録する。
+        // 記録が無いと、持ち出されたアイテムが本人の復元案内に含まれて複製される
+        for (inventory in listOf(view.topInventory, view.bottomInventory)) {
+            val holder = inventory.holder as? HumanEntity ?: continue
+            if (holder.uniqueId != player.uniqueId) creative.onMovedOut(holder.uniqueId)
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
