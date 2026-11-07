@@ -19,6 +19,7 @@ import net.torosaba.core.module.itemdropcooldown.ItemDropCooldownModule
 import net.torosaba.core.module.killpotiondeathlog.KillPotionDeathLogModule
 import net.torosaba.core.module.lift.LiftModule
 import net.torosaba.core.module.lunachat.LunaChatModule
+import net.torosaba.core.module.mapdirty.MapDirtyModule
 import net.torosaba.core.module.raidwatcher.RaidWatcherModule
 import net.torosaba.core.module.report.ReportModule
 import net.torosaba.core.module.seemore.SeeMoreModule
@@ -60,5 +61,6 @@ object Modules {
         SeeMoreModule(),
         DynmapWorldGuardModule(),
         DynmapLiveModule(),
+        MapDirtyModule(),
     )
 }
