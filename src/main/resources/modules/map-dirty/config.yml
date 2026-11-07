@@ -1,10 +1,22 @@
-# map-dirty: ブロックの変更をチャンク単位で記録する (記録のみ。地図の描画にはまだ使わない)
+# map-dirty: ブロックの変更をチャンク単位で集めて、地図の更新につなげる
 # 有効にするには、TORO-Core の config.yml で modules.map-dirty を true にする (既定は無効)。
-# 記録はこのフォルダの map-dirty.jsonl に 1 窓 1 行で書かれる。
+# 窓が確定するたびに、記録 (map-dirty.jsonl) は常に行い、送信と BlueMap 連携は下の設定で行う。
 
-# 窓の長さ (秒)。この間の変更をまとめて 1 件の記録にする
+# 窓の長さ (秒)。この間の変更をまとめて 1 件にする
 window-seconds: 10
 # 記録ファイル 1 つの上限 (MB)。超えたら世代をずらして古いものを消す
 max-file-size-mb: 16
 # 残す世代数 (今書いているファイルを含む)
 generations: 7
+
+# TORO-Renderer の watch への送信先 (WebSocket)。feed-token と両方そろったときだけ送る
+# token は接続直後の 1 通で見せる (受け手の Godot は接続時のヘッダーを読めないため)
+feed-endpoint: ''
+# TORO-Renderer の watch 側 (TORO_DIRTY_TOKEN か --dirty-token-file) と同じ値。空のときは送らない
+feed-token: ''
+
+# BlueMap が入っているとき、窓の確定に合わせて変更範囲の再描画を BlueMap に頼むか
+bluemap: true
+# true のときは、変更の有無の判定を飛ばして対象リージョンを描き直させる
+# (イベントの時点ではチャンクがまだ保存されていないことがあるため、判定に任せると空振りする)
+bluemap-force: true
