@@ -15,6 +15,11 @@ repositories {
             includeGroup("net.md-5")
         }
     }
+    maven("https://repo.bluecolored.de/releases") {
+        content {
+            includeGroup("de.bluecolored")
+        }
+    }
     maven("https://repo.mikeprimm.com/") {
         content {
             includeGroup("us.dynmap")
@@ -59,6 +64,8 @@ dependencies {
     compileOnly("com.sk89q.worldguard:worldguard-core:7.0.20") { isTransitive = false }
     compileOnly("com.sk89q.worldguard.worldguard-libs:core:7.0.20") { isTransitive = false }
     compileOnly("com.sk89q.worldedit:worldedit-core:7.4.6") { isTransitive = false }
+    // regions の Vector2i (flow-math) が API の署名に要るので、これは推移依存を有効にする
+    compileOnly("de.bluecolored:bluemap-api:2.7.4")
 
     testImplementation("io.papermc.paper:paper-api:26.3.build.227-stable")
     testImplementation(kotlin("test-junit5"))

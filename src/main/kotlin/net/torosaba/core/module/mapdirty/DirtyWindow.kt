@@ -81,6 +81,9 @@ data class WindowSnapshot(
 ) {
     fun count(source: DirtySource): Int = worlds.values.sumOf { it[source]?.size ?: 0 }
 
+    /** TORO-Renderer へ送る 1 通。記録の JSON に種別 (t) を付けたもので、中身の並びは記録と同じ */
+    fun toFeedJson(): String = "{\"t\":\"dirty\"," + toJson().substring(1)
+
     fun toJson(): String = buildString {
         append("{\"start\":").append(startMillis)
         append(",\"end\":").append(endMillis)
