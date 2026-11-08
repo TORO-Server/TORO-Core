@@ -94,7 +94,3 @@ JDK 25 と Gradle ラッパー (Gradle 9.3.0。`gradle-wrapper.properties` の `
 - `src/main/kotlin/net/torosaba/core/module/<モジュール>/` — 各モジュール
 - `src/main/resources/modules/<モジュール id>/` — 各モジュールの既定の設定
 - モジュールを足すときは `Module` を継承したクラスを作り、`Modules.kt` の一覧と `config.yml` の `modules` に加える
-
-## ライセンス
-
-他者製のプラグインを元にしたモジュールのライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照。
