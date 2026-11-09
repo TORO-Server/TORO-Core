@@ -10,6 +10,8 @@ modules:
   armor-stand: true
   auto-message: true
   ban-player-sheet: true
+  # 単体 jar からの移行が終わるまでは無効 (二重に動かさないため)
+  click-minecart: false
   clock: true
   clock-item-timer: true
   dispenser-actions: true

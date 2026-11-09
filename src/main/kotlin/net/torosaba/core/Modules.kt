@@ -4,6 +4,7 @@ import net.torosaba.core.module.addperm.AddPermModule
 import net.torosaba.core.module.armorstand.ArmorStandModule
 import net.torosaba.core.module.automessage.AutoMessageModule
 import net.torosaba.core.module.banplayersheet.BanPlayerSheetModule
+import net.torosaba.core.module.clickminecart.ClickMinecartModule
 import net.torosaba.core.module.clock.ClockModule
 import net.torosaba.core.module.clockitemtimer.ClockItemTimerModule
 import net.torosaba.core.module.dispenseractions.DispenserActionsModule
@@ -37,6 +38,7 @@ object Modules {
         ArmorStandModule(),
         AutoMessageModule(),
         BanPlayerSheetModule(),
+        ClickMinecartModule(),
         ClockModule(),
         ClockItemTimerModule(),
         DispenserActionsModule(),
