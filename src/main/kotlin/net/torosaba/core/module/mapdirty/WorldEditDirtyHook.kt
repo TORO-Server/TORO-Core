@@ -17,6 +17,10 @@ import java.util.concurrent.ConcurrentHashMap
  * WorldEdit が入っていないときはこのクラス自体を読み込まない (呼び出し側で分けてある)。
  *
  * 集めたチャンクは、セッションがコミットされたとき (extent の commit) にまとめて [DirtyWindow] へ渡す。
+ * ただしコミットは 1 回限りではない。LocalSession.createEditSession は生成の仕上げに
+ * EditSession.setReorderMode を呼び、その中でセッションがコミットされるため、
+ * 編集が 1 件も無いうちに最初のコミットが届く。確定を 1 回限りにすると、その後の編集が
+ * すべて捨てられてしまう。そのため確定は、呼ばれるたびに未送信のチャンクだけを渡す形にする。
  * コミットを通らない進み方に備えて、最後の書き換えから [IDLE_MILLIS] 静かだったセッションも
  * [sweep] が確定させる。WorldEdit 7.4.6 にはセッションの終了を知らせる公開イベントが無いための措置。
  */
@@ -35,12 +39,10 @@ class WorldEditDirtyHook(private val window: DirtyWindow) {
         sessions.clear()
     }
 
-    /** 静かになったセッションを確定させる。モジュールのタイマーから定期的に呼ぶ */
+    /** 静かになったセッションを確定させて手放す。モジュールのタイマーから定期的に呼ぶ */
     fun sweep(nowMillis: Long) {
         for (session in sessions) {
-            if (session.published) {
-                sessions.remove(session)
-            } else if (nowMillis - session.lastActivityMillis >= IDLE_MILLIS) {
+            if (nowMillis - session.lastActivityMillis >= IDLE_MILLIS) {
                 session.publish()
                 sessions.remove(session)
             }
@@ -65,20 +67,21 @@ class WorldEditDirtyHook(private val window: DirtyWindow) {
         var lastActivityMillis: Long = System.currentTimeMillis()
             private set
 
-        @Volatile
-        var published: Boolean = false
-            private set
-
         fun record(blockX: Int, blockZ: Int) {
             chunks += ChunkMath.pack(ChunkMath.chunkOf(blockX), ChunkMath.chunkOf(blockZ))
             lastActivityMillis = System.currentTimeMillis()
         }
 
-        /** 集めたチャンクを窓へ渡す。重なって呼ばれても、窓側は集合なので結果は変わらない */
+        /**
+         * 集めたチャンクを窓へ渡し、手元からは消す。
+         * 編集前にコミットが届くことがある (クラスの説明参照) ので 1 回限りにはせず、
+         * 空のうちに呼ばれたら何もしない。後の編集は次の確定で渡る
+         */
         fun publish() {
-            if (published) return
-            published = true
-            if (chunks.isNotEmpty()) window.addChunks(worldName, chunks.toList(), DirtySource.WORLDEDIT)
+            if (chunks.isEmpty()) return
+            val drained = chunks.toList()
+            for (packed in drained) chunks.remove(packed)
+            window.addChunks(worldName, drained, DirtySource.WORLDEDIT)
         }
     }
 
