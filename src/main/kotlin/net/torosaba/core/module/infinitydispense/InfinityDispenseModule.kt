@@ -25,7 +25,7 @@ class InfinityDispenseModule : Module("infinity-dispense", "InfinityDispense"), 
 
     override fun onEnable() {
         tagKey = NamespacedKey(plugin, "infinity_dispenser")
-        permission("infinitydispense.create", PermissionDefault.OP, "無限ディスペンサーを設置する権限")
+        permission("infinitydispense.create", PermissionDefault.TRUE, "無限ディスペンサーを設置する権限")
         listen(this)
     }
 

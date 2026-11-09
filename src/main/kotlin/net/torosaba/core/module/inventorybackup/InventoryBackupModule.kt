@@ -53,7 +53,7 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
     private val clearWatch = mutableMapOf<UUID, Array<ItemStack?>>()
 
     override fun onEnable() {
-        permission(RESTORE_PERMISSION, PermissionDefault.OP, "インベントリの復元を許可する権限")
+        permission(RESTORE_PERMISSION, PermissionDefault.TRUE, "インベントリの復元を許可する権限")
         command(
             "restore",
             permission = RESTORE_PERMISSION,
