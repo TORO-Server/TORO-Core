@@ -43,7 +43,7 @@ class TextBeaconModule : Module("text-beacon", "TextBeacon") {
         saveScheduled = false
 
         permission("textbeacon.use", PermissionDefault.TRUE, "TextBeaconのメッセージを受け取る権限")
-        permission("textbeacon.create", PermissionDefault.OP, "TextBeacon看板を作成する権限")
+        permission("textbeacon.create", PermissionDefault.TRUE, "TextBeacon看板を作成する権限")
         permission("textbeacon.remove", PermissionDefault.OP, "TextBeaconを削除する権限")
         permission("textbeacon.admin", PermissionDefault.OP, "TextBeaconの範囲を可視化を利用する権限")
 

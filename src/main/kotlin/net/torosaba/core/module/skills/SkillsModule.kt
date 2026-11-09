@@ -38,7 +38,7 @@ class SkillsModule : Module("skills", "Skills") {
         skillItemKey = NamespacedKey(plugin, "skill_item")
         registerGrappleRecipe()
         listen(SkillListener(this))
-        permission("skills.use", org.bukkit.permissions.PermissionDefault.OP, "スキルGUIを使う")
+        permission("skills.use", org.bukkit.permissions.PermissionDefault.TRUE, "スキルGUIを使う")
         command("skill", permission = "skills.use", description = "スキルを選択", usage = "/skill") { sender, _, _ ->
             if (sender is Player) sender.openInventory(ClassMenu().inventory)
             true

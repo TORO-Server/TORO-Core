@@ -29,7 +29,7 @@ class TeleportSpectatorModule : Module("teleport-spectator", "TeleportSpectator"
 
     override fun onEnable() {
         essentials = if (Bukkit.getPluginManager().isPluginEnabled("Essentials")) EssentialsTeleport() else null
-        permission("teleportspectator.use", PermissionDefault.OP, "スペクテイターテレポートを使う")
+        permission("teleportspectator.use", PermissionDefault.TRUE, "スペクテイターテレポートを使う")
         command("stp", permission = "teleportspectator.use", description = "/stp [player]") { sender, _, args ->
             if (sender is Player) {
                 stp(sender, args)
