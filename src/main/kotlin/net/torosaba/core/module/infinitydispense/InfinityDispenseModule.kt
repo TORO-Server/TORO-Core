@@ -15,7 +15,7 @@ import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.permissions.PermissionDefault
 import org.bukkit.persistence.PersistentDataType
 
-/** 旧 InfinityDispense。config の name と同じ名前のディスペンサーとドロッパーはアイテムを消費しない */
+/** 旧 InfinityDispense。config の name と同じ名前のディスペンサーとドロッパーはアイテムを消費しない。旧プラグインは名前だけで判定していたため、タグの無い既存の設置物も対象とする */
 class InfinityDispenseModule : Module("infinity-dispense", "InfinityDispense"), Listener {
 
     private lateinit var tagKey: NamespacedKey
@@ -55,7 +55,7 @@ class InfinityDispenseModule : Module("infinity-dispense", "InfinityDispense"), 
         val state = block.getState(false)
         if (state !is Nameable || state !is Container) return
         if (state.customName()?.legacyText() != config.getString("name")) return
-        if (!state.persistentDataContainer.has(tagKey, PersistentDataType.BYTE)) return
+        // 旧プラグインは名前だけで判定していたため、タグの無い既存の設置物も無限として扱う
 
         event.isCancelled = true
         // 次の tick に中身を写してから発射し、発射後に中身を戻す
