@@ -76,14 +76,17 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
 
     private fun authenticate(ws: WebSocket) {
         val auth = "{\"t\":\"auth\",\"token\":${jsonString(token)}}"
-        ws.sendText(auth, true).whenComplete { _, e ->
-            if (e != null) {
-                drop(ws, e)
-            } else {
-                authed = true
-                trySend()
+        ws.sendText(auth, true)
+            .orTimeout(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .whenComplete { _, e ->
+                if (e != null) {
+                    drop(ws, e)
+                } else {
+                    authed = true
+                    logger.info("TORO-Renderer ($uri) への認証が済みました")
+                    trySend()
+                }
             }
-        }
     }
 
     private fun trySend() {
@@ -91,16 +94,20 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
         if (!authed || sending) return
         val snapshot = buffer.take(MAX_CHUNKS_PER_MESSAGE) ?: return
         sending = true
-        ws.sendText(snapshot.toFeedJson(), true).whenComplete { _, e ->
-            sending = false
-            if (e != null) {
-                // 送れなかった分は貯めに戻す (重なりは集合なので潰れてよい)
-                buffer.offer(snapshot)
-                drop(ws, e)
-            } else {
-                trySend()
+        // 送信が完了も失敗もせず宙吊りになると sending が戻らず以後送れなくなるので、
+        // 一定時間で見切りをつけて失敗扱いにし、貯め戻しと再接続へ進める
+        ws.sendText(snapshot.toFeedJson(), true)
+            .orTimeout(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .whenComplete { _, e ->
+                sending = false
+                if (e != null) {
+                    // 送れなかった分は貯めに戻す (重なりは集合なので潰れてよい)
+                    buffer.offer(snapshot)
+                    drop(ws, e)
+                } else {
+                    trySend()
+                }
             }
-        }
     }
 
     private fun later() {
@@ -132,6 +139,8 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
         }
 
         override fun onError(ws: WebSocket, error: Throwable) {
+            if (!warned) logger.log(Level.WARNING, "TORO-Renderer との接続でエラーが起きました。つなぎ直します", error)
+            warned = true
             drop(ws, error)
         }
     }
@@ -150,5 +159,8 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
     private companion object {
         /** 1 通に入れるチャンクの上限。これを超える分は次の機会に送る */
         const val MAX_CHUNKS_PER_MESSAGE = 200_000
+
+        /** 送信を見切るまでの秒数。接続時の見切りと同じ長さ */
+        const val SEND_TIMEOUT_SECONDS = 10L
     }
 }
