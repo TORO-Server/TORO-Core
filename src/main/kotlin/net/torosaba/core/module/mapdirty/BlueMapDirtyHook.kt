@@ -50,11 +50,13 @@ class BlueMapDirtyHook(
             val maps = mapsOf(current, world)
             if (maps.isEmpty()) continue
             val regions = ChunkMath.regionsOf(chunks).map { Vector2i(ChunkMath.unpackX(it), ChunkMath.unpackZ(it)) }
+            // 窓がフックへ届いたことを運用ログでも確かめられるようにする (窓は 10 秒間隔なので量は問題にならない)
+            logger.info("BlueMap へ再描画を依頼します (world $world、${chunks.size} チャンク、${regions.size} リージョン、map ${maps.size} 件)")
             for (map in maps) {
                 try {
                     current.renderManager.scheduleMapUpdateTask(map, regions, force)
                 } catch (e: Exception) {
-                    logger.log(Level.FINE, "BlueMap への再描画の依頼に失敗しました (map ${map.id})", e)
+                    logger.log(Level.WARNING, "BlueMap への再描画の依頼に失敗しました (map ${map.id})", e)
                 }
             }
         }
