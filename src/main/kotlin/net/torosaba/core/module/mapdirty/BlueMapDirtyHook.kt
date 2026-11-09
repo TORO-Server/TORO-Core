@@ -105,10 +105,22 @@ class BlueMapDirtyHook(
 
     /**
      * Bukkit のワールド名に対応する BlueMap のマップ。
-     * BlueMap のワールド ID は通常はワールド名そのものだが、保存フォルダの末尾の名前でも確かめる。
+     * 照合の条件は [matchesWorld] を見ること。
      */
     private fun mapsOf(api: BlueMapAPI, worldName: String): List<BlueMapMap> =
         api.maps.filter { map ->
-            map.world.id == worldName || map.world.saveFolder.fileName?.toString() == worldName
+            matchesWorld(map.world.id, map.world.saveFolder.fileName?.toString(), worldName)
         }
 }
+
+/**
+ * BlueMap のマップが Bukkit のワールドに対応するかの照合。
+ *
+ * ワールド ID の完全一致のほか、BlueMap が使う「ワールド名#ディメンション」の形の ID
+ * (例: main#minecraft:overworld) では「#」より前の部分の一致でも対応するとみなす。
+ * それでも決まらないときの予備として、保存フォルダの末尾の名前でも確かめる。
+ */
+internal fun matchesWorld(worldId: String, saveFolderName: String?, worldName: String): Boolean =
+    worldId == worldName ||
+        worldId.substringBefore('#') == worldName ||
+        saveFolderName == worldName
