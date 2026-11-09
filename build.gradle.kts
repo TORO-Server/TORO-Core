@@ -42,6 +42,11 @@ repositories {
             includeGroup("com.sk89q.worldguard.worldguard-libs")
             // worldedit-core の POM が読み込む BOM
             includeGroup("org.enginehub.lin-bus")
+            includeGroup("org.enginehub.lin-bus.format")
+            // worldedit-core の推移依存 (テストで実物を読み込むために要る)
+            includeGroup("com.sk89q.worldedit.worldedit-libs")
+            includeGroup("com.sk89q.lib")
+            includeGroup("com.sk89q")
         }
     }
     mavenCentral()
@@ -68,6 +73,9 @@ dependencies {
     compileOnly("de.bluecolored:bluemap-api:2.7.4")
 
     testImplementation("io.papermc.paper:paper-api:26.3.build.227-stable")
+    // WorldEdit の記録経路を実物に近い形でテストするためのもの。本番のスコープ (compileOnly) は変えない
+    testImplementation("com.sk89q.worldedit:worldedit-core:7.4.6")
+    testImplementation("com.google.guava:guava:32.1.2-jre")
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.11.4")
