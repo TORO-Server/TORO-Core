@@ -19,6 +19,7 @@ internal class Settings(config: YamlConfiguration) {
     val maxTps = config.getInt("MaxTPS")
     val warnTps = config.getInt("WarnTPS")
     val url = config.getString("WebhookURL") ?: ""
+    val mentionUserId = config.getString("MentionUserId") ?: ""
     val embedColor = config.getInt("EmbedColor")
     val discord = config.getBoolean("Discord")
     val serverLog = config.getBoolean("ServerLog")

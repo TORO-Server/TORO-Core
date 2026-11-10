@@ -21,6 +21,8 @@ WebhookURL: ""
 #Discord Embed Color
 EmbedColor: 12915218
 Discord: false
+#Discord Mention User ID (Empty = No Mention)
+MentionUserId: ""
 
 ServerLog: true
 
