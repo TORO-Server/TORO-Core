@@ -21,7 +21,7 @@ class TpsLogModule : Module("tps-log", "Tps_log") {
     private lateinit var settings: Settings
     private val http: HttpClient by lazy { HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() }
 
-    private class PlayerData(val name: String, val world: String, val location: String, val uuid: String)
+    internal class PlayerData(val name: String, val world: String, val location: String, val uuid: String)
 
     override fun onEnable() {
         settings = Settings(config)
@@ -89,23 +89,7 @@ class TpsLogModule : Module("tps-log", "Tps_log") {
 
     private fun discordJson(textTps: String, players: List<PlayerData>?): String {
         val timestamp = ZonedDateTime.now(ZoneOffset.UTC).format(TIMESTAMP)
-        val embed = StringBuilder()
-        embed.append("\"title\":${json(textTps)},\"color\":${settings.embedColor},\"timestamp\":${json(timestamp)}")
-        if (players != null) {
-            if (players.isNotEmpty()) {
-                val fields = buildList {
-                    add(settings.playerNameText to players.map { it.name })
-                    if (settings.world) add(settings.playerWorldText to players.map { it.world })
-                    if (settings.location) add(settings.playerLocationText to players.map { it.location })
-                    if (settings.uuid) add(settings.playerUUIDText to players.map { it.uuid })
-                }.joinToString(",") { (name, values) ->
-                    "{\"name\":${json(name)},\"value\":${json(values.joinToString("\n"))},\"inline\":true}"
-                }
-                embed.append(",\"fields\":[$fields]")
-            }
-            embed.append(",\"description\":${json("${settings.playerListText} : ${players.size}")}")
-        }
-        return "{\"embeds\":[{$embed}]}"
+        return payload(settings, textTps, players, timestamp)
     }
 
     private fun post(url: String, body: String) {
@@ -129,9 +113,40 @@ class TpsLogModule : Module("tps-log", "Tps_log") {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val MEASURE_TICKS = 300L
         val TIMESTAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm'Z'")
+
+        /**
+         * Webhook に送る JSON を組み立てる。
+         * 埋め込みだけではメンションの通知が出ないので、MentionUserId が設定されているときは
+         * content にメンションを入れ、allowed_mentions でユーザーメンションだけを有効にする。
+         * MentionUserId が空なら、従来どおり埋め込みだけを送る。
+         */
+        fun payload(settings: Settings, textTps: String, players: List<PlayerData>?, timestamp: String): String {
+            val embed = StringBuilder()
+            embed.append("\"title\":${json(textTps)},\"color\":${settings.embedColor},\"timestamp\":${json(timestamp)}")
+            if (players != null) {
+                if (players.isNotEmpty()) {
+                    val fields = buildList {
+                        add(settings.playerNameText to players.map { it.name })
+                        if (settings.world) add(settings.playerWorldText to players.map { it.world })
+                        if (settings.location) add(settings.playerLocationText to players.map { it.location })
+                        if (settings.uuid) add(settings.playerUUIDText to players.map { it.uuid })
+                    }.joinToString(",") { (name, values) ->
+                        "{\"name\":${json(name)},\"value\":${json(values.joinToString("\n"))},\"inline\":true}"
+                    }
+                    embed.append(",\"fields\":[$fields]")
+                }
+                embed.append(",\"description\":${json("${settings.playerListText} : ${players.size}")}")
+            }
+            val body = StringBuilder()
+            if (settings.mentionUserId.isNotBlank()) {
+                body.append("\"content\":${json("<@${settings.mentionUserId}>")},\"allowed_mentions\":{\"parse\":[\"users\"]},")
+            }
+            body.append("\"embeds\":[{$embed}]")
+            return "{$body}"
+        }
 
         /** JSON の文字列にする */
         fun json(text: String): String = buildString {

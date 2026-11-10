@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "net.torosaba"
-version = "1.0.0"
+version = "1.1.0"
 
 // 各リポジトリから取るグループを限定する。Maven Central を最後にして、下のグループは先に専用のリポジトリを見る
 repositories {
