@@ -1,5 +1,8 @@
 package net.torosaba.core.module.automessage
 
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.Style
+import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.torosaba.core.Module
 import org.bukkit.Bukkit
@@ -9,10 +12,15 @@ import org.bukkit.Bukkit
  * AllSendMessage が true なら、全部を 1 回ずつ流し終えるまで同じメッセージは選ばない。
  */
 class AutoMessageModule : Module("auto-message", "Auto_message") {
-    // メッセージは § の色コードで書かれている。URL はクリックできるようにする (元の broadcastMessage と同じ)
+    private val urlStyle = Style.style()
+        .color(NamedTextColor.AQUA)
+        .decorate(TextDecoration.UNDERLINED)
+        .build()
+
+    // メッセージは § の色コードで書かれている。URL はリンクとわかるよう下線と水色のスタイルを付与し、クリックできるようにする (元の broadcastMessage と同じ)
     private val serializer = LegacyComponentSerializer.builder()
         .character(LegacyComponentSerializer.SECTION_CHAR)
-        .extractUrls()
+        .extractUrls(urlStyle)
         .build()
 
     override fun onEnable() {
