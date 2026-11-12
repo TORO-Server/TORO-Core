@@ -13,7 +13,7 @@ import java.util.logging.Level
 import java.util.logging.Logger
 
 /**
- * toro-map-web への WebSocket。切れたら少しずつ間を空けてつなぎ直す。
+ * toro-webmap への WebSocket。切れたら少しずつ間を空けてつなぎ直す。
  * 送るのは最新の 1 通だけでよいので、前の送信が終わっていないときは今回の分を捨てる。
  */
 class LiveClient(private val uri: URI, private val token: String, private val logger: Logger) {

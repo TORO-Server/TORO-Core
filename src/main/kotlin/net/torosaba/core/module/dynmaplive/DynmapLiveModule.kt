@@ -6,10 +6,10 @@ import org.bukkit.attribute.Attribute
 import java.net.URI
 
 /**
- * 地図 (map.torosaba.net) にプレイヤーの動きをすぐ出すため、全員の位置と体力を toro-map-web に送り続ける。
+ * 地図 (map.torosaba.net) にプレイヤーの動きをすぐ出すため、全員の位置と体力を toro-webmap に送り続ける。
  *
  * 地図に誰を出すか (隠れている人、透明化しているときなど) は、これまでどおり dynmap が決める。
- * toro-map-web は dynmap が地図に出しているプレイヤーの位置だけをブラウザに流すので、ここでは全員分を送る。
+ * toro-webmap は dynmap が地図に出しているプレイヤーの位置だけをブラウザに流すので、ここでは全員分を送る。
  * 送り先は Docker の中のネットワークだけで、token で確かめる。
  */
 class DynmapLiveModule : Module("dynmap-live") {

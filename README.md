@@ -37,8 +37,8 @@ TORO サーバー (torosaba.net, Paper 26.3) の小さな自作プラグイン�
 | `dynmap-live` | (新しく作った機能) | - |
 
 `dynmap-live` は、地図 (map.torosaba.net) にプレイヤーの動きをすぐ出すため、全員の位置と体力を 0.25 秒ごとに
-toro-map-web (ServerImage の `map-web/`) へ WebSocket で送る。地図に誰を出すかは dynmap が決め、toro-map-web は
-dynmap が出しているプレイヤーの分だけをブラウザに流す。`dynmap-live/config.yml` の `token` は toro-map-web の
+toro-webmap (ServerImage の `map-web/`) へ WebSocket で送る。地図に誰を出すかは dynmap が決め、toro-webmap は
+dynmap が出しているプレイヤーの分だけをブラウザに流す。`dynmap-live/config.yml` の `token` は toro-webmap の
 `NUXT_LIVE_TOKEN` (ServerImage の `map-web.env`) と同じ値にする。空のときは送らない。
 
 コマンド名・権限ノード・設定のキーは元のプラグインと同じ。
