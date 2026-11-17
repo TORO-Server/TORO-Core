@@ -17,6 +17,8 @@ modules:
   dispenser-actions: true
   dispenser-falling-block: true
   effect-gui: true
+  # クライアントにだけ OP の権限レベルを伝える共有部品。sign-keep などが使う (単体では何もしない)
+  fake-op: false
   hat-color-team: true
   hide-nametag: true
   infinity-dispense: true
@@ -25,6 +27,8 @@ modules:
   kill-potion-death-log: true
   raid-watcher: true
   report: true
+  # 26.3 の看板の編集画面対策。実クライアントでの確認と本番の手順が済むまでは無効
+  sign-keep: false
   skills: true
   teleport-spectator: true
   text-beacon: true
