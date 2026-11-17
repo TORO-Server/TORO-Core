@@ -6,7 +6,7 @@ TORO サーバーで使う、小さな自作プラグインと、開発の止ま
 
 ## 使い方
 
-1. 元のプラグインの JAR を `plugins/` から外す (残すと同じ機能が二重に動きます)
+1. 元のプラグインの JAR (プラグイン本体のファイル) を `plugins/` から外す (残すと同じ機能が二重に動きます)
 2. `TORO-Core-<バージョン>.jar` を `plugins/` に入れて起動する
 3. モジュールを止めるときは `plugins/TORO-Core/config.yml` の `modules.<モジュール>` を `false` にして `/torocore reload`
 
@@ -18,7 +18,7 @@ TORO サーバーで使う、小さな自作プラグインと、開発の止ま
 ./gradlew build
 ```
 
-必要なものは JDK 25 です (`build.gradle.kts` の `jvmToolchain`)。配る JAR は `build/libs/` にできます。
+必要なものは JDK (Java の開発用の道具一式) 25 です (`build.gradle.kts` の `jvmToolchain`)。配る JAR は `build/libs/` にできます。
 
 ## 関連文書
 
