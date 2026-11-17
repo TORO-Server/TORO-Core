@@ -12,6 +12,7 @@ import net.torosaba.core.module.dispenserfallingblock.DispenserFallingBlockModul
 import net.torosaba.core.module.dynmaplive.DynmapLiveModule
 import net.torosaba.core.module.dynmapworldguard.DynmapWorldGuardModule
 import net.torosaba.core.module.effectgui.EffectGuiModule
+import net.torosaba.core.module.fakeop.FakeOpModule
 import net.torosaba.core.module.hatcolorteam.HatColorTeamModule
 import net.torosaba.core.module.hidenametag.HideNametagModule
 import net.torosaba.core.module.infinitydispense.InfinityDispenseModule
@@ -24,6 +25,7 @@ import net.torosaba.core.module.mapdirty.MapDirtyModule
 import net.torosaba.core.module.raidwatcher.RaidWatcherModule
 import net.torosaba.core.module.report.ReportModule
 import net.torosaba.core.module.seemore.SeeMoreModule
+import net.torosaba.core.module.signkeep.SignKeepModule
 import net.torosaba.core.module.skills.SkillsModule
 import net.torosaba.core.module.teleportspectator.TeleportSpectatorModule
 import net.torosaba.core.module.textbeacon.TextBeaconModule
@@ -44,6 +46,7 @@ object Modules {
         DispenserActionsModule(),
         DispenserFallingBlockModule(),
         EffectGuiModule(),
+        FakeOpModule(),
         HatColorTeamModule(),
         HideNametagModule(),
         InfinityDispenseModule(),
@@ -52,6 +55,7 @@ object Modules {
         KillPotionDeathLogModule(),
         RaidWatcherModule(),
         ReportModule(),
+        SignKeepModule(),
         SkillsModule(),
         TeleportSpectatorModule(),
         TextBeaconModule(),

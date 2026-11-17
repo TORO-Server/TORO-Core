@@ -15,6 +15,7 @@
 | `dispenser-actions` | DispenserActions | - |
 | `dispenser-falling-block` | Dispenser_FallingBlock | - |
 | `effect-gui` | Effect_GUI | `/effectgui` |
+| `fake-op` | (新しく作った共有部品) | - |
 | `hat-color-team` | HatColorTeam | - |
 | `hide-nametag` | HideNametagCMD | `/nttoggle` |
 | `infinity-dispense` | InfinityDispense | - |
@@ -23,6 +24,7 @@
 | `kill-potion-death-log` | EssKillPotionBack (KillPotionDeathLog) | - |
 | `raid-watcher` | raidwatcher | - |
 | `report` | Report | `/report` `/reportblock` |
+| `sign-keep` | (新しく作った機能) | - |
 | `skills` | Skills | `/skill` |
 | `teleport-spectator` | TeleportSpectator | `/stp` |
 | `text-beacon` | TextBeacon | `/tb` |
@@ -35,6 +37,12 @@
 | `dynmap-worldguard` | Dynmap-WorldGuard (webbukkit) | - |
 | `dynmap-live` | (新しく作った機能) | - |
 
+`fake-op` は、プレイヤーのクライアントにだけ OP の権限レベル (最小は 2) を伝える共有部品 (`FakeOp`)。サーバー側の権限
+(`isOp`、`ops.json`、コマンドの権限) は変えない。F3+F4 のゲームモード切替のように、クライアントが手元で権限を判定する
+機能に使う。単体では誰にも送らず、`FakeOp.register` で対象を登録したモジュール (`sign-keep` など) があるときだけ働く。
+`sign-keep` は、文字入りの看板を置いた直後の編集画面を止め (Minecraft 26.3 で編集画面が開くようになったため)、
+旧い形式 (`block_entity_data`) の看板データを持つアイテムから、OP 以外の建築担当にも文字を書く。どちらも既定は無効。
+詳しくは各モジュールの `config.yml` を見る。
 `dynmap-live` は、地図にプレイヤーの動きをすぐ出すため、全員の位置と体力を短い間隔 (既定は 5 tick。tick はゲームの時間の単位で、1 秒は 20 tick なので 0.25 秒。`interval-ticks`) で、地図の画面のサービス ([TORO-WebMap](https://github.com/TORO-Server/TORO-WebMap)) へ WebSocket で送る。地図に誰を出すかは dynmap が決める。`dynmap-live/config.yml` の `token` は、受け取る側と同じ値にする (値は git に入れず、環境ごとに決める)。`endpoint` か `token` が空のときは送らない。
 
 コマンド名・権限ノード・設定のキーは元のプラグインと同じ。

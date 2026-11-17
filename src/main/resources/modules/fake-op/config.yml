@@ -1,0 +1,16 @@
+# TORO-Core の fake-op モジュール。
+# クライアントにだけ OP の権限レベルを伝える共有部品 (net.torosaba.core.module.fakeop.FakeOp)。
+# このモジュール自体は誰にも送らない。sign-keep など、FakeOp.register で対象を登録したモジュールがあるときだけ働く。
+# サーバー側の権限 (isOp、ops.json、コマンドの権限) は変わらない。
+
+# 偽の権限レベルを送ったとき、コンソールにログを出す
+log: true
+
+# 偽の権限レベルを送り直すきっかけ。バニラは入室・リスポーン・ディメンション移動で実際のレベルを送り直すので、
+# 通常はすべて残す。join / respawn / world-change / gamemode から選ぶ (動作の計測や切り分け用)
+resend-on:
+  - join
+  - respawn
+  - world-change
+  - gamemode
+
