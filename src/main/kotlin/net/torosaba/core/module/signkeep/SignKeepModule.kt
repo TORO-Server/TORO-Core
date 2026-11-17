@@ -35,7 +35,8 @@ import org.bukkit.permissions.PermissionDefault
  * - 設定 `fake-op.enabled` を true にすると、共有部品 [FakeOp] を通して対象のプレイヤーの
  *   クライアントにだけ OP の権限レベルを伝える (サーバー側の権限は変えない)。看板の文字を残すだけなら
  *   不要 (ピックブロックの判定はサーバー側で、Paper の `minecraft.nbt.copy` 権限による)。
- */class SignKeepModule : Module("sign-keep"), Listener {
+ */
+class SignKeepModule : Module("sign-keep"), Listener {
     private var log = true
     private var permissionNode = DEFAULT_PERMISSION
     private var includeOps = true
@@ -54,7 +55,7 @@ import org.bukkit.permissions.PermissionDefault
         if (config.getBoolean("fake-op.enabled", false)) {
             val level = config.getInt("fake-op.level", FakeOp.GAMEMASTER_LEVEL)
             FakeOp.register(FAKE_OP_OWNER, level, ::isTarget)
-            logger.info("対象のプレイヤーのクライアントに権限レベル ${level.coerceIn(1, 4)} を伝えます (fake-op モジュールが有効のとき)")
+            logger.info("対象のプレイヤーのクライアントに権限レベル ${level.coerceIn(FakeOp.GAMEMASTER_LEVEL, 4)} を伝えます (fake-op モジュールが有効のとき)")
             // すでに入っているプレイヤーにもすぐ反映する (/torocore reload など)
             Bukkit.getOnlinePlayers().forEach { FakeOp.refresh(it) }
         }

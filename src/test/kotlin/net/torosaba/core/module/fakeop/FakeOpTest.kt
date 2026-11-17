@@ -44,4 +44,12 @@ class FakeOpTest {
         assertEquals(0, FakeOp.levelFor(player("p")))
         FakeOp.clear()
     }
+
+    @Test
+    fun levelBelowGamemasterIsRaisedToTwo() {
+        FakeOp.clear()
+        FakeOp.register("x", 1) { true }
+        assertEquals(FakeOp.GAMEMASTER_LEVEL, FakeOp.levelFor(player("p")))
+        FakeOp.clear()
+    }
 }

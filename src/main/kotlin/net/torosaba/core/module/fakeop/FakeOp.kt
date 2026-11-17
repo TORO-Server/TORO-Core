@@ -37,15 +37,15 @@ object FakeOp {
 
     /**
      * [owner] (モジュールの名前など) の要求を登録する。同じ [owner] の要求は置き換える。
-     * [level] は 1〜4 に収める。0 以下は偽装にならないので登録しない。
+     * [level] は [GAMEMASTER_LEVEL] (2) 〜 4 に収める。クライアントの判定を満たすのは 2 以上だけで、
+     * 1 は何も有効にしないため、1 は 2 に引き上げる。0 以下は偽装にならないので登録しない (既存の登録は外す)。
      */
     fun register(owner: String, level: Int, target: (Player) -> Boolean) {
-        val clamped = level.coerceAtMost(MAX_LEVEL)
-        if (clamped <= 0) {
+        if (level <= 0) {
             requests.remove(owner)
             return
         }
-        requests[owner] = Request(owner, clamped, target)
+        requests[owner] = Request(owner, level.coerceIn(GAMEMASTER_LEVEL, MAX_LEVEL), target)
     }
 
     /** 登録を外す。偽のレベルを受けていたプレイヤーには、実際のレベルを送り直す */
