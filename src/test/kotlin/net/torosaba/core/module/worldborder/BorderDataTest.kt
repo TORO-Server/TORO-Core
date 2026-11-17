@@ -113,7 +113,7 @@ class BorderDataTest {
             fill-autosave-frequency: 30
             no-players-toggle: false
             bypass-list-uuids:
-            - 069a79f4-44e9-4726-a5be-fca90e38aaf5
+            - 00000000-0000-0000-0000-000000000001
             worlds:
               world:
                 x: 0.5
