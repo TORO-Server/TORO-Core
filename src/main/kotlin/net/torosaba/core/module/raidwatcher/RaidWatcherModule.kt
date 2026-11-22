@@ -15,7 +15,9 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.permissions.PermissionDefault
+import java.net.Inet6Address
 import java.net.InetAddress
+import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -71,7 +73,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
     private inner class WatchListener : Listener {
         @EventHandler
         fun onPlayerJoin(event: PlayerJoinEvent) {
-            val ip = event.player.address?.address?.hostAddress ?: event.player.address?.hostString
+            val ip = event.player.address?.address?.let(::ipKey) ?: event.player.address?.hostString
             if (ip != null) onlinePlayerIps[event.player.uniqueId] = ip
         }
 
@@ -89,7 +91,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
             if (hasBypass(event.uniqueId)) return
 
             // 同じ IP で別アカウントの同時参加
-            val ip = event.address.hostAddress
+            val ip = ipKey(event.address)
             if (settings.oneIpMultiAccount && onlinePlayerIps.values.any { it == ip }) {
                 event.disallow(
                     AsyncPlayerPreLoginEvent.Result.KICK_OTHER,
@@ -169,7 +171,7 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
     /** IP で人を区別できるアドレスなら文字列にする。プロキシの内側のアドレスは全員同じに見えることがあるので使わない */
     private fun clientIp(address: InetAddress): String? =
         address.takeUnless { it.isLoopbackAddress || it.isSiteLocalAddress || it.isLinkLocalAddress || it.isAnyLocalAddress }
-            ?.hostAddress
+            ?.let(::ipKey)
 
     /** まだ Player が無いので、LuckPerms か OP で raidwatcher.bypass を調べる */
     private fun hasBypass(uuid: UUID): Boolean {
@@ -245,9 +247,39 @@ class RaidWatcherModule : Module("raid-watcher", "raidwatcher") {
     private data class SpamDetector(val enable: Boolean, val allowed: Int, val per: Int, val penaltyMute: String?, val penaltyKick: Boolean)
     private data class ChatFilter(val enable: Boolean, val pattern: List<Pattern>, val penaltyMute: String?, val penaltyKick: Boolean)
 
-    private companion object {
+    internal companion object {
         const val BYPASS = "raidwatcher.bypass"
         val BUSY_MESSAGE = Component.text("現在、サーバーが大変込み合っておりますので入室制限をかけております。時間を置いて再度お試しください。")
         val TOO_MANY_LOGINS_MESSAGE = Component.text("短い時間に何度も接続しています。時間を置いて再度お試しください。")
+
+        /**
+         * OneIPMultiAccountBlocker と LoginRateLimiter 用の IP キー。
+         * IPv6 は SLAAC 一時アドレス等の下位 64 ビット変動を吸収するため `/64` プレフィックス文字列に正規化し、
+         * IPv4 (および IPv4 射影アドレス) は `hostAddress` をそのまま返す。
+         */
+        internal fun ipKey(address: InetAddress): String {
+            if (address is Inet6Address) {
+                val b = address.address
+                val isMappedV4 = (0..9).all { b[it] == 0.toByte() } &&
+                    b[10] == 0xff.toByte() &&
+                    b[11] == 0xff.toByte()
+                if (isMappedV4) {
+                    return InetAddress.getByAddress(b.copyOfRange(12, 16)).hostAddress
+                }
+                return String.format(
+                    Locale.ROOT,
+                    "%02x%02x:%02x%02x:%02x%02x:%02x%02x::/64",
+                    b[0].toInt() and 0xff,
+                    b[1].toInt() and 0xff,
+                    b[2].toInt() and 0xff,
+                    b[3].toInt() and 0xff,
+                    b[4].toInt() and 0xff,
+                    b[5].toInt() and 0xff,
+                    b[6].toInt() and 0xff,
+                    b[7].toInt() and 0xff,
+                )
+            }
+            return address.hostAddress
+        }
     }
 }
