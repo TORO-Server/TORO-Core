@@ -99,4 +99,30 @@ class DirtyFeedBufferTest {
         )
         assertEquals(setOf(ChunkMath.pack(0, 0), ChunkMath.pack(1, 0), ChunkMath.pack(-1, -1)), regions)
     }
+
+    @Test
+    fun `貯めの上限を超えたチャンクは切り捨てられる`() {
+        val buffer = DirtyFeedBuffer(maxChunks = 3)
+        buffer.offer(snapshot(0, 10, "world", 0 to 0, 1 to 0, 2 to 0, 3 to 0, 4 to 0))
+        assertEquals(3, buffer.size())
+        // 既存の重複チャンクを含んでも上限を超えない
+        buffer.offer(snapshot(10, 20, "world", 0 to 0, 9 to 9))
+        assertEquals(3, buffer.size())
+    }
+
+    @Test
+    fun `バイト数上限に収まる範囲で分割して取り出せる`() {
+        val buffer = DirtyFeedBuffer()
+        val chunks = (0 until 500).map { it to -it }.toTypedArray()
+        buffer.offer(snapshot(0, 100, "world_main", *chunks))
+        val limit = 1024
+        var total = 0
+        while (!buffer.isEmpty()) {
+            val part = assertNotNull(buffer.takeMaxBytes(limit))
+            val jsonBytes = part.toFeedJson().toByteArray(Charsets.UTF_8).size
+            assertTrue(jsonBytes <= limit, "jsonBytes=$jsonBytes exceeded $limit")
+            total += part.count(DirtySource.BUKKIT)
+        }
+        assertEquals(500, total)
+    }
 }

@@ -92,7 +92,7 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
     private fun trySend() {
         val ws = socket ?: return
         if (!authed || sending) return
-        val snapshot = buffer.take(MAX_CHUNKS_PER_MESSAGE) ?: return
+        val snapshot = buffer.takeMaxBytes(MAX_MESSAGE_BYTES) ?: return
         sending = true
         // 送信が完了も失敗もせず宙吊りになると sending が戻らず以後送れなくなるので、
         // 一定時間で見切りをつけて失敗扱いにし、貯め戻しと再接続へ進める
@@ -120,6 +120,10 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
         if (socket !== ws) return
         socket = null
         authed = false
+        try {
+            ws.abort()
+        } catch (_: Exception) {
+        }
         if (e != null) logger.log(Level.FINE, "TORO-Renderer への接続が切れました", e)
         later()
     }
@@ -157,8 +161,8 @@ class DirtyFeedClient(private val uri: URI, private val token: String, private v
     }
 
     private companion object {
-        /** 1 通に入れるチャンクの上限。これを超える分は次の機会に送る */
-        const val MAX_CHUNKS_PER_MESSAGE = 200_000
+        /** 1 通の JSON バイト数の上限 (受信側 WebSocketPeer の既定バッファ 64 KB 未満に収める) */
+        const val MAX_MESSAGE_BYTES = 48 * 1024
 
         /** 送信を見切るまでの秒数。接続時の見切りと同じ長さ */
         const val SEND_TIMEOUT_SECONDS = 10L
