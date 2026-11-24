@@ -16,6 +16,12 @@ internal class SubCommand(
 /** /lunachat (/ch /lc) と、そのサブコマンド (LunaChat の LunaChatCommand と各 *Command) */
 internal class LunaChatCommand(private val lc: LunaChatModule) {
     private val manager get() = lc.manager
+
+    private fun publicChannel(name: String?): Channel? =
+        manager.getChannel(name)?.takeIf { !it.isPersonalChat }
+
+    private fun defaultPublicChannel(playerName: String): Channel? =
+        manager.getDefaultChannel(playerName)?.takeIf { !it.isPersonalChat }
     private val settings get() = lc.settings
     private val messages get() = lc.messages
 
@@ -111,7 +117,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             return
         }
 
-        val channel = manager.getChannel(channelName)
+        val channel = publicChannel(channelName)
         if (channel == null) {
             if (settings.globalChannel.isEmpty() && channelName == settings.globalMarker) {
                 // グローバルチャンネルが無く、マーカーを指定したら、発言先を通常チャットに戻す
@@ -223,8 +229,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
     }
 
     private fun leave(sender: ChannelMember, label: String, args: Array<String>) {
-        val channelName = args.getOrNull(1) ?: manager.getDefaultChannel(sender.name)?.name
-        val channel = manager.getChannel(channelName)
+        val channelName = args.getOrNull(1) ?: defaultPublicChannel(sender.name)?.name
+        val channel = publicChannel(channelName)
         if (channel == null) {
             sender.error("errmsgNotExist")
             return
@@ -251,8 +257,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
     }
 
     private fun info(sender: ChannelMember, label: String, args: Array<String>) {
-        val name = args.getOrNull(1) ?: manager.getDefaultChannel(sender.name)?.name
-        val channel = manager.getChannel(name)
+        val name = args.getOrNull(1) ?: defaultPublicChannel(sender.name)?.name
+        val channel = publicChannel(name)
         if (channel == null) {
             sender.error("errmsgNotExist")
             return
@@ -283,7 +289,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
                 arg == "r=" || arg == "r" -> reverse = true
             }
         }
-        if (cname == null) cname = manager.getDefaultChannel(sender.name)?.name
+        if (cname == null) cname = defaultPublicChannel(sender.name)?.name
 
         val node = "lunachat.log.$cname"
         if (sender.isPermissionSet(node) && !sender.hasPermission(node)) {
@@ -297,7 +303,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             title = "GlobalChat"
             read = { lc.normalChatLogger.read(player, filter, date, reverse) }
         } else {
-            val channel = manager.getChannel(cname)
+            val channel = publicChannel(cname)
             if (channel == null) {
                 sender.error("errmsgNotExist")
                 return
@@ -351,7 +357,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             forceInvite(sender, args)
             return
         }
-        val channel = manager.getDefaultChannel(sender.name)
+        val channel = defaultPublicChannel(sender.name)
         if (channel == null) {
             sender.error("errmsgNoJoin")
             return
@@ -386,8 +392,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgPermission", "permission" to node)
             return
         }
-        val cname = args.getOrNull(3) ?: manager.getDefaultChannel(sender.name)?.name
-        val channel = manager.getChannel(cname)
+        val cname = args.getOrNull(3) ?: defaultPublicChannel(sender.name)?.name
+        val channel = publicChannel(cname)
         if (channel == null) {
             sender.error("errmsgNotExist")
             return
@@ -414,7 +420,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgNotInvited")
             return
         }
-        val channel = manager.getChannel(channelName)
+        val channel = publicChannel(channelName)
         if (channel == null) {
             sender.error("errmsgNotfoundChannel")
             return
@@ -456,7 +462,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgCommand")
             return null
         }
-        val channel = if (channelArg != null) manager.getChannel(channelArg) else manager.getDefaultChannel(sender.name)
+        val channel = if (channelArg != null) publicChannel(channelArg) else defaultPublicChannel(sender.name)
         if (channel == null) {
             sender.error("errmsgNoJoin")
             return null
@@ -492,7 +498,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
      * LunaChat 3 は常にチャンネル名として扱うため期限付きにできなかったので、数字でチャンネルも無ければ期限とみなす
      */
     private fun splitExpireArg(arg: String?): Pair<String?, String?> =
-        if (arg != null && arg.matches(Regex("[0-9]+")) && manager.getChannel(arg) == null) null to arg else arg to null
+        if (arg != null && arg.matches(Regex("[0-9]+")) && publicChannel(arg) == null) null to arg else arg to null
 
     private fun parseExpire(sender: ChannelMember, minutes: String?, errorKey: String): Int? {
         if (minutes == null) return -1
@@ -610,7 +616,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
         var isPlayerCommand = false
         var isChannelCommand = false
         if (args.size <= 1) {
-            target = manager.getDefaultChannel(sender.name)?.name
+            target = defaultPublicChannel(sender.name)?.name
         } else if (hide && args[1] == "list") {
             sender.plain("hideChannelFirstLine")
             val prefix = messages.plain("listPlainPrefix")
@@ -629,7 +635,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             target = args[1]
         }
 
-        val channel = manager.getChannel(target)
+        val channel = publicChannel(target)
         if (!isPlayerCommand && channel != null) {
             isChannelCommand = true
         } else if (isChannelCommand || target == null || lc.memberByName(target) == null) {
@@ -704,8 +710,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
     }
 
     private fun remove(sender: ChannelMember, label: String, args: Array<String>) {
-        val name = args.getOrNull(1) ?: manager.getDefaultChannel(sender.name)?.name
-        val channel = manager.getChannel(name)
+        val name = args.getOrNull(1) ?: defaultPublicChannel(sender.name)?.name
+        val channel = publicChannel(name)
         if (channel == null) {
             sender.error("errmsgNotExist")
             return
@@ -730,8 +736,8 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
             sender.error("errmsgCommand")
             return null
         }
-        val specified = if (args.size >= 3) manager.getChannel(args[1]) else null
-        val channel = specified ?: manager.getDefaultChannel(sender.name)
+        val specified = if (args.size >= 3) publicChannel(args[1]) else null
+        val channel = specified ?: defaultPublicChannel(sender.name)
         val rest = args.drop(if (specified != null) 2 else 1)
         if (channel == null) {
             sender.error("errmsgNotExist")
@@ -978,7 +984,7 @@ internal class LunaChatCommand(private val lc: LunaChatModule) {
         if (args.size >= 3 && args[1].equals("default", true)) {
             val target = lc.memberByName(args[2])
             val targetName = target?.name ?: args[2]
-            val channel = if (args.size >= 4) manager.getChannel(args[3]) else manager.getDefaultChannel(sender.name)
+            val channel = if (args.size >= 4) publicChannel(args[3]) else defaultPublicChannel(sender.name)
             if (channel == null) {
                 sender.error("errmsgNotExistOrNotSpecified")
                 return

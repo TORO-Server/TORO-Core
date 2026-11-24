@@ -285,7 +285,7 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
 
     fun addMember(player: ChannelMember) {
         if (player in storedMembers) return
-        if (storedMembers.isEmpty() && moderator.isEmpty()) moderator += player
+        if (!isPersonalChat && storedMembers.isEmpty() && moderator.isEmpty()) moderator += player
         storedMembers += player
         if (!isPersonalChat) messages.channel("joinMessage", colorCode, name, "player" to player.name)?.let { player.send(it) }
         save()
@@ -311,9 +311,9 @@ internal class Channel(private val lc: LunaChatModule, val name: String) {
     }
 
     fun addModerator(player: ChannelMember) {
-        if (player in moderator) return
+        if (isPersonalChat || player in moderator) return
         moderator += player
-        if (!isPersonalChat) messages.channel("addModeratorMessage", colorCode, name, "player" to player.name)?.let { player.send(it) }
+        messages.channel("addModeratorMessage", colorCode, name, "player" to player.name)?.let { player.send(it) }
         save()
     }
 
