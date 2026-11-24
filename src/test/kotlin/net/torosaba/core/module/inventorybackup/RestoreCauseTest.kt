@@ -23,6 +23,15 @@ class RestoreCauseTest {
         assertNull(RestoreCause.clearCommandLabel("/clearlag"))
         assertNull(RestoreCause.clearCommandLabel("/execute as @a run say clear"))
         assertNull(RestoreCause.clearCommandLabel(""))
+
+        assertTrue(RestoreCause.isEssentialsClearLabel("ci"))
+        assertTrue(RestoreCause.isEssentialsClearLabel("essentials:clear"))
+        assertFalse(RestoreCause.isEssentialsClearLabel("clear"))
+        assertFalse(RestoreCause.isEssentialsClearLabel("minecraft:clear"))
+
+        assertNull(RestoreCause.clearTargetArg("/ci"))
+        assertEquals("Steve", RestoreCause.clearTargetArg("/ci Steve"))
+        assertEquals("@a", RestoreCause.clearTargetArg("execute as @a run clear @a"))
     }
 
     @Test

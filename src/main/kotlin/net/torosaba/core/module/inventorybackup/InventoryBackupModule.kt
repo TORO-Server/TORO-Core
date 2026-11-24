@@ -6,13 +6,19 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.torosaba.core.Module
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
+import org.bukkit.Material
 import org.bukkit.command.CommandSender
+import org.bukkit.command.PluginIdentifiableCommand
 import org.bukkit.entity.HumanEntity
 import org.bukkit.entity.Player
+import org.bukkit.event.Event
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
+import org.bukkit.event.block.Action
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryCreativeEvent
@@ -20,6 +26,10 @@ import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.inventory.InventoryType
 import org.bukkit.event.player.PlayerCommandPreprocessEvent
 import org.bukkit.event.player.PlayerDropItemEvent
+import org.bukkit.event.player.PlayerInteractAtEntityEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
+import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemConsumeEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.event.server.RemoteServerCommandEvent
@@ -124,10 +134,43 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
         creative.onMovedOut(event.player.uniqueId)
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBlockPlace(event: BlockPlaceEvent) {
+        clearWatch.remove(event.player.uniqueId)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onInteractEntity(event: PlayerInteractEntityEvent) {
+        clearWatch.remove(event.player.uniqueId)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onInteractAtEntity(event: PlayerInteractAtEntityEvent) {
+        clearWatch.remove(event.player.uniqueId)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onInteractBlock(event: PlayerInteractEvent) {
+        if (event.action == Action.RIGHT_CLICK_BLOCK && event.useItemInHand() != Event.Result.DENY && event.hasItem()) {
+            clearWatch.remove(event.player.uniqueId)
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onConsume(event: PlayerItemConsumeEvent) {
+        clearWatch.remove(event.player.uniqueId)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onProjectileLaunch(event: ProjectileLaunchEvent) {
+        (event.entity.shooter as? Player)?.let { clearWatch.remove(it.uniqueId) }
+    }
+
     // ---- 死亡 ----
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onDeath(event: PlayerDeathEvent) {
+        clearWatch.remove(event.entity.uniqueId)
         if (!RestoreCause.isDeathLoss(event.keepInventory, event.drops.isNotEmpty())) return
         val player = event.entity
         val items = player.inventory.contents
@@ -156,18 +199,59 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onRemoteCommand(event: RemoteServerCommandEvent) = watchClear(event.sender, event.command)
 
-    /** クリアのコマンドなら、いまの中身を覚えて、次の tick に空になった人へ案内する */
+    /** クリアのコマンドなら、対象プレイヤーのいまの中身を覚えて、次の tick に空になった人へ案内する */
     private fun watchClear(sender: CommandSender, line: String) {
         val label = RestoreCause.clearCommandLabel(line) ?: return
         // 権限が無くて実行されないコマンドでは案内しない
         val command = Bukkit.getCommandMap().getCommand(label) ?: return
         if (!command.testPermissionSilent(sender)) return
+        val isEssentials = RestoreCause.isEssentialsClearLabel(label) ||
+            (command as? PluginIdentifiableCommand)?.plugin?.name.equals("Essentials", ignoreCase = true) ||
+            command.permission.isNullOrEmpty()
+        if (isEssentials && !sender.hasPermission(ESSENTIALS_CLEAR_PERMISSION)) return
 
-        if (clearWatch.isEmpty()) runLater(1L) { settleClearWatch() }
-        for (player in Bukkit.getOnlinePlayers()) {
-            if (!player.hasPermission(RESTORE_PERMISSION)) continue
+        val targetArg = RestoreCause.clearTargetArg(line)
+        val targets: List<Player> = when {
+            targetArg == null || targetArg == "@s" -> listOfNotNull(sender as? Player)
+            targetArg == "*" -> {
+                if (isEssentials && !sender.hasPermission(ESSENTIALS_CLEAR_OTHERS_PERMISSION)) return
+                Bukkit.getOnlinePlayers().toList()
+            }
+            targetArg.startsWith("@") -> {
+                if (isEssentials && !sender.hasPermission(ESSENTIALS_CLEAR_OTHERS_PERMISSION)) return
+                try {
+                    Bukkit.selectEntities(sender, targetArg).filterIsInstance<Player>()
+                } catch (_: IllegalArgumentException) {
+                    emptyList()
+                }
+            }
+            else -> {
+                val target = Bukkit.getPlayerExact(targetArg)
+                when {
+                    target != null -> {
+                        if (sender is Player && target.uniqueId != sender.uniqueId &&
+                            isEssentials && !sender.hasPermission(ESSENTIALS_CLEAR_OTHERS_PERMISSION)
+                        ) {
+                            return
+                        }
+                        listOf(target)
+                    }
+                    isEssentials && sender is Player && Material.matchMaterial(targetArg) != null -> listOf(sender)
+                    else -> emptyList()
+                }
+            }
+        }
+        if (targets.isEmpty()) return
+
+        val snapshots = targets.mapNotNull { player ->
+            if (!player.hasPermission(RESTORE_PERMISSION)) return@mapNotNull null
             val items = player.inventory.contents
-            if (!items.allNull()) clearWatch.putIfAbsent(player.uniqueId, items.cloneAll())
+            if (items.allNull()) null else player.uniqueId to items.cloneAll()
+        }
+        if (snapshots.isEmpty()) return
+        if (clearWatch.isEmpty()) runLater(1L) { settleClearWatch() }
+        for ((uuid, items) in snapshots) {
+            clearWatch.putIfAbsent(uuid, items)
         }
     }
 
@@ -211,6 +295,8 @@ class InventoryBackupModule : Module("inventory-backup", "InventoryBackup"), Lis
 
     private companion object {
         const val RESTORE_PERMISSION = "inventory_backup.restore"
+        const val ESSENTIALS_CLEAR_PERMISSION = "essentials.clearinventory"
+        const val ESSENTIALS_CLEAR_OTHERS_PERMISSION = "essentials.clearinventory.others"
 
         val section = LegacyComponentSerializer.legacySection()
 
@@ -231,11 +317,30 @@ internal object RestoreCause {
         "clear", "eclear", "clearinventory", "eclearinventory", "clearinvent", "eclearinvent", "ci", "eci", "clean", "eclean",
     )
 
+    private val essentialsClearCommands = setOf(
+        "eclear", "clearinventory", "eclearinventory", "clearinvent", "eclearinvent", "ci", "eci", "clean", "eclean",
+    )
+
     /** コマンドの行がクリアのコマンドなら、そのラベル (`minecraft:clear` など) を返す。`execute ... run` の先も見る */
     fun clearCommandLabel(line: String): String? {
         val command = line.trim().removePrefix("/").let { if (" run " in it) it.substringAfterLast(" run ").trim() else it }
         val label = command.substringBefore(' ').lowercase()
         return label.takeIf { it.substringAfterLast(':') in clearCommands }
+    }
+
+    /** Essentials のクリアコマンドか (`essentials:*` または Essentials 固有の別名) */
+    fun isEssentialsClearLabel(label: String): Boolean {
+        val lower = label.lowercase()
+        val ns = lower.substringBefore(':', "")
+        val cmd = lower.substringAfterLast(':')
+        return ns == "essentials" || cmd in essentialsClearCommands
+    }
+
+    /** クリアコマンドの行からターゲット引数を取り出す (省略時は null = 実行者自身) */
+    fun clearTargetArg(line: String): String? {
+        val command = line.trim().removePrefix("/").let { if (" run " in it) it.substringAfterLast(" run ").trim() else it }
+        val parts = command.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        return parts.getOrNull(1)
     }
 
     /**
