@@ -1,6 +1,5 @@
 package net.torosaba.core.module.report
 
-import io.papermc.paper.event.player.AsyncChatEvent
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import net.torosaba.core.Module
@@ -8,10 +7,12 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
@@ -33,10 +34,10 @@ class ReportModule : Module("report", "Report") {
     // チャットのイベントは非同期で来る
     private val sessions = ConcurrentHashMap<UUID, Session>()
     private val history = mutableMapOf<UUID, ArrayDeque<Long>>()
-
     private val plain = PlainTextComponentSerializer.plainText()
 
     override fun onEnable() {
+        activeModules += this
         val url = config.getString("webhook-url", "") ?: ""
         webhook = if (url.isEmpty()) {
             logger.warning("Webhook URL が設定されていません！")
@@ -73,6 +74,7 @@ class ReportModule : Module("report", "Report") {
     }
 
     override fun onDisable() {
+        activeModules -= this
         // 開いている通報の GUI を閉じる
         Bukkit.getOnlinePlayers()
             .filter { it.openInventory.topInventory.holder is ReportMenu }
@@ -225,31 +227,42 @@ class ReportModule : Module("report", "Report") {
             sessions.remove(e.player.uniqueId)
         }
 
-        @EventHandler
-        fun onChat(e: AsyncChatEvent) {
+        @Suppress("DEPRECATION")
+        @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+        fun onChat(e: AsyncPlayerChatEvent) {
             val p = e.player
             val state = sessions[p.uniqueId] ?: return
             when {
                 state.waitingReasonText -> {
                     e.isCancelled = true
-                    state.reasonDetail = plain.serialize(e.message())
+                    state.reasonDetail = e.message
                     state.waitingReasonText = false
                     runSync { if (p.isOnline) openPlayerMenu(p) }
                 }
                 state.waitingHarassmentDetail -> {
                     e.isCancelled = true
-                    state.harassmentDetail = plain.serialize(e.message())
+                    state.harassmentDetail = e.message
                     state.waitingHarassmentDetail = false
                     runSync { if (p.isOnline) openPlayerMenu(p) }
                 }
                 state.waitingPlayerName -> {
                     e.isCancelled = true
-                    state.target = plain.serialize(e.message())
+                    state.target = e.message
                     state.waitingPlayerName = false
                     runSync { if (p.isOnline) finishReport(p) }
                 }
             }
         }
+    }
+
+    companion object {
+        private val activeModules = ConcurrentHashMap.newKeySet<ReportModule>()
+
+        internal fun isAwaitingChat(uuid: UUID): Boolean =
+            activeModules.any { module ->
+                val state = module.sessions[uuid] ?: return@any false
+                state.waitingReasonText || state.waitingHarassmentDetail || state.waitingPlayerName
+            }
     }
 
     private fun item(m: Material, name: String) = ItemStack(m).apply {

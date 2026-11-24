@@ -1,8 +1,10 @@
 package net.torosaba.core.module.lunachat
 
+import io.papermc.paper.event.player.AsyncChatEvent
 import net.kyori.adventure.text.Component
 import net.torosaba.core.module.lunachat.japanize.JapanizeType
 import net.torosaba.core.module.lunachat.japanize.Japanizer
+import net.torosaba.core.module.report.ReportModule
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -11,6 +13,8 @@ import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import java.util.IllegalFormatException
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /** 発言をどこへ流すかの判定 (テストできるよう Bukkit に触らない部分) */
 object ChatRouting {
@@ -78,7 +82,20 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
         if (lc.settings.playerChatEventListenerPriority == priority) process(event)
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onPaperChatMonitor(event: AsyncChatEvent) {
+        val uuid = event.player.uniqueId
+        if (event.isCancelled) {
+            paperCancelledAt[uuid] = System.currentTimeMillis()
+        } else {
+            paperCancelledAt.remove(uuid)
+        }
+    }
+
+    private val paperCancelledAt = ConcurrentHashMap<UUID, Long>()
+
     private fun process(event: AsyncPlayerChatEvent) {
+        if (ReportModule.isAwaitingChat(event.player.uniqueId)) return
         val settings = lc.settings
         val manager = lc.manager
 
@@ -215,11 +232,13 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
         val type = settings.japanizeType
         val ngwords = settings.ngword
         val wait = settings.japanizeWait.toLong().coerceAtLeast(0)
+        val sentAt = System.currentTimeMillis()
         lc.async {
             val japanized = Japanizer.japanize(message, type, keywords, dictionary, ngwords)
             val result = Japanizer.format(format, message, japanized)
             lc.later(wait) {
-                if (event.isCancelled) return@later
+                val cancelledLater = paperCancelledAt[player.uniqueId]?.let { it >= sentAt - 1000L } == true
+                if (event.isCancelled || cancelledLater) return@later
                 val component: Component = Colors.component(result)
                 event.recipients.forEach { it.sendMessage(component) }
                 lc.consoleLog(result)
@@ -260,6 +279,7 @@ internal class ChatListener(private val lc: LunaChatModule) : Listener {
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         val player = event.player
+        paperCancelledAt.remove(player.uniqueId)
         val pname = player.name
         val quitter = lc.member(player)
         // 両方がいなくなった 1:1 チャットのチャンネルを消す (退出する人はもういないものとして数える)
